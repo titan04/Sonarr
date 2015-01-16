@@ -17,19 +17,16 @@ namespace NzbDrone.Api.Commands
 {
     public class CommandModule : NzbDroneRestModuleWithSignalR<CommandResource, Command>, IHandle<CommandUpdatedEvent>
     {
-        private readonly ICommandExecutor _commandExecutor;
+        private readonly ICommandService _commandService;
         private readonly IContainer _container;
-        private readonly ITrackCommands _trackCommands;
 
-        public CommandModule(ICommandExecutor commandExecutor,
+        public CommandModule(ICommandService commandService,
                              IBroadcastSignalRMessage signalRBroadcaster,
-                             IContainer container,
-                             ITrackCommands trackCommands)
+                             IContainer container)
             : base(signalRBroadcaster)
         {
-            _commandExecutor = commandExecutor;
+            _commandService = commandService;
             _container = container;
-            _trackCommands = trackCommands;
 
             GetResourceById = GetCommand;
             CreateResource = StartCommand;
@@ -40,12 +37,12 @@ namespace NzbDrone.Api.Commands
 
         private CommandResource GetCommand(int id)
         {
-            return _trackCommands.GetById(id).InjectTo<CommandResource>();
+            return _commandService.Get(id).InjectTo<CommandResource>();
         }
 
         private int StartCommand(CommandResource commandResource)
         {
-            var commandType =
+            var commandType = 
               _container.GetImplementations(typeof(Command))
                         .Single(c => c.Name.Replace("Command", "")
                         .Equals(commandResource.Name, StringComparison.InvariantCultureIgnoreCase));
@@ -53,18 +50,18 @@ namespace NzbDrone.Api.Commands
             dynamic command = Request.Body.FromJson(commandType);
             command.Manual = true;
 
-            var trackedCommand = (Command)_commandExecutor.PublishCommandAsync(command);
+            var trackedCommand = (CommandModel)_commandService.PublishCommand(command);
             return trackedCommand.Id;
         }
 
         private List<CommandResource> GetAllCommands()
         {
-            return ToListResource(_trackCommands.RunningCommands);
+            return ToListResource(_commandService.GetStarted());
         }
 
         public void Handle(CommandUpdatedEvent message)
         {
-            if (message.Command.SendUpdatesToClient)
+            if (message.Command.Body.SendUpdatesToClient)
             {
                 BroadcastResourceChange(ModelAction.Updated, message.Command.Id);
             }

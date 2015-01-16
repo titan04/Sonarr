@@ -2,9 +2,11 @@ namespace NzbDrone.Core.Messaging.Commands.Tracking
 {
     public enum CommandStatus
     {
-        Pending,
-        Running,
+        Queued,
+        Started,
         Completed,
-        Failed
+        Failed,
+        Aborted,
+        Cancelled
     }
 }

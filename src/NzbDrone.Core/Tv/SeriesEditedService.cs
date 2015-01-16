@@ -7,18 +7,18 @@ namespace NzbDrone.Core.Tv
 {
     public class SeriesEditedService : IHandle<SeriesEditedEvent>
     {
-        private readonly CommandExecutor _commandExecutor;
+        private readonly ICommandService _commandService;
 
-        public SeriesEditedService(CommandExecutor commandExecutor)
+        public SeriesEditedService(ICommandService commandService)
         {
-            _commandExecutor = commandExecutor;
+            _commandService = commandService;
         }
 
         public void Handle(SeriesEditedEvent message)
         {
             if (message.Series.SeriesType != message.OldSeries.SeriesType)
             {
-                _commandExecutor.PublishCommandAsync(new RefreshSeriesCommand(message.Series.Id));
+                _commandService.PublishCommand(new RefreshSeriesCommand(message.Series.Id));
             }
         }
     }

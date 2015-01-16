@@ -235,6 +235,7 @@
     <Compile Include="Datastore\Migration\060_remove_enable_from_indexers.cs" />
     <Compile Include="Datastore\Migration\062_convert_quality_models.cs" />
     <Compile Include="Datastore\Migration\065_make_scene_numbering_nullable.cs" />
+    <Compile Include="Datastore\Migration\075_add_commands_table.cs" />
     <Compile Include="Datastore\Migration\068_add_release_restrictions.cs" />
     <Compile Include="Datastore\Migration\066_add_tags.cs" />
     <Compile Include="Datastore\Migration\067_add_added_to_series.cs" />
@@ -522,7 +523,7 @@
     <Compile Include="Instrumentation\LogRepository.cs" />
     <Compile Include="Instrumentation\LogService.cs" />
     <Compile Include="Instrumentation\ReconfigureLogging.cs" />
-    <Compile Include="Jobs\JobRepository.cs" />
+    <Compile Include="Jobs\ScheduledTaskRepository.cs" />
     <Compile Include="Jobs\ScheduledTask.cs" />
     <Compile Include="Jobs\Scheduler.cs" />
     <Compile Include="Jobs\TaskManager.cs" />
@@ -537,7 +538,6 @@
     <Compile Include="MediaCover\MediaCoverService.cs" />
     <Compile Include="MediaCover\MediaCoversUpdatedEvent.cs" />
     <Compile Include="MediaFiles\Commands\BackendCommandAttribute.cs" />
-    <Compile Include="MediaFiles\Commands\CleanMediaFileDb.cs" />
     <Compile Include="MediaFiles\Commands\CleanUpRecycleBinCommand.cs" />
     <Compile Include="MediaFiles\Commands\DownloadedEpisodesScanCommand.cs" />
     <Compile Include="MediaFiles\Commands\RenameFilesCommand.cs" />
@@ -595,15 +595,17 @@
     <Compile Include="Messaging\Commands\Command.cs" />
     <Compile Include="Messaging\Commands\CommandEqualityComparer.cs" />
     <Compile Include="Messaging\Commands\CommandExecutor.cs" />
-    <Compile Include="Messaging\Commands\ICommandExecutor.cs" />
+    <Compile Include="Messaging\Commands\CommandModel.cs" />
+    <Compile Include="Messaging\Commands\CommandPriority.cs" />
+    <Compile Include="Messaging\Events\CommandQueuedEvent.cs" />
+    <Compile Include="Messaging\Commands\CommandRepository.cs" />
+    <Compile Include="Messaging\Commands\CommandService.cs" />
+    <Compile Include="Messaging\Commands\CommandTrigger.cs" />
     <Compile Include="Messaging\Commands\IExecute.cs" />
     <Compile Include="Messaging\Commands\TestCommand.cs" />
     <Compile Include="Messaging\Commands\TestCommandExecutor.cs" />
     <Compile Include="Messaging\Commands\Tracking\CommandStatus.cs" />
-    <Compile Include="Messaging\Commands\Tracking\CommandTrackingService.cs" />
-    <Compile Include="Messaging\Commands\Tracking\ExistingCommand.cs" />
     <Compile Include="Messaging\Commands\Tracking\TrackedCommandCleanupCommand.cs" />
-    <Compile Include="Messaging\Events\CommandCreatedEvent.cs" />
     <Compile Include="Messaging\Events\CommandExecutedEvent.cs" />
     <Compile Include="Messaging\Events\EventAggregator.cs" />
     <Compile Include="Messaging\Events\IEventAggregator.cs" />

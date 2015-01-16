@@ -12,14 +12,17 @@ namespace NzbDrone.Core.Download
     {
         private readonly IConfigService _configService;
         private readonly IEpisodeService _episodeService;
-        private readonly ICommandExecutor _commandExecutor;
+        private readonly ICommandService _commandService;
         private readonly Logger _logger;
 
-        public RedownloadFailedDownloadService(IConfigService configService, IEpisodeService episodeService, ICommandExecutor commandExecutor, Logger logger)
+        public RedownloadFailedDownloadService(IConfigService configService,
+                                               IEpisodeService episodeService,
+                                               ICommandService commandService,
+                                               Logger logger)
         {
             _configService = configService;
             _episodeService = episodeService;
-            _commandExecutor = commandExecutor;
+            _commandService = commandService;
             _logger = logger;
         }
 
@@ -35,7 +38,7 @@ namespace NzbDrone.Core.Download
             {
                 _logger.Debug("Failed download only contains one episode, searching again");
 
-                _commandExecutor.PublishCommandAsync(new EpisodeSearchCommand(message.EpisodeIds));
+                _commandService.PublishCommand(new EpisodeSearchCommand(message.EpisodeIds));
 
                 return;
             }
@@ -47,7 +50,7 @@ namespace NzbDrone.Core.Download
             {
                 _logger.Debug("Failed download was entire season, searching again");
 
-                _commandExecutor.PublishCommandAsync(new SeasonSearchCommand
+                _commandService.PublishCommand(new SeasonSearchCommand
                 {
                     SeriesId = message.SeriesId,
                     SeasonNumber = seasonNumber
@@ -58,7 +61,7 @@ namespace NzbDrone.Core.Download
 
             _logger.Debug("Failed download contains multiple episodes, probably a double episode, searching again");
 
-            _commandExecutor.PublishCommandAsync(new EpisodeSearchCommand(message.EpisodeIds));
+            _commandService.PublishCommand(new EpisodeSearchCommand(message.EpisodeIds));
         }
     }
 }
