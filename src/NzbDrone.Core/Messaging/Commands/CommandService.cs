@@ -6,8 +6,6 @@ using NzbDrone.Common;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Jobs;
-using NzbDrone.Core.Messaging.Commands.Events;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.Messaging.Commands
@@ -44,9 +42,35 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public CommandModel PublishCommand<TCommand>(TCommand command) where TCommand : Command
         {
-            var commandModel = PublishCommandInternal(command);
+            Ensure.That(command, () => command).IsNotNull();
 
-            _eventAggregator.PublishEvent(new CommandQueuedEvent());
+            _logger.Trace("Publishing {0}", command.GetType().Name);
+
+            var existingCommands = _repo.FindCommands(command.Name).Where(c => c.Status == CommandStatus.Queued ||
+                                                                               c.Status == CommandStatus.Started).ToList();
+
+            var existing = existingCommands.SingleOrDefault(c => CommandEqualityComparer.Instance.Equals(c.Body, command));
+
+            if (existing != null)
+            {
+                _logger.Trace("Command is already in progress: {0}", command.GetType().Name);
+
+                //TODO: Return existing command model
+                return existing;
+            }
+
+            //TODO: store command trigger type
+            var commandModel = new CommandModel
+            {
+                Name = command.Name,
+                Body = command,
+                Queued = DateTime.UtcNow,
+                Trigger = command.Trigger,
+                Priority = CommandPriority.Normal,
+                Status = CommandStatus.Queued
+            };
+
+            _repo.Insert(commandModel);
 
             return commandModel;
         }
@@ -55,27 +79,24 @@ namespace NzbDrone.Core.Messaging.Commands
         {
             var command = PublishCommand(commandName, null);
 
-            _eventAggregator.PublishEvent(new CommandQueuedEvent());
-
             return command;
         }
 
-        private CommandModel PublishCommand(string commandName, DateTime? lastExecutionTime)
+        private CommandModel PublishCommand(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
         {
             dynamic command = GetCommand(commandName);
             command.LastExecutionTime = lastExecutionTime;
+            command.Trigger = trigger;
 
-            return PublishCommandInternal(command);
+            return PublishCommand(command);
         }
 
         public void PublishScheduledTasks(List<ScheduledTask> scheduledTasks)
         {
             foreach (var scheduledTask in scheduledTasks)
             {
-                PublishCommand(scheduledTask.TypeName, scheduledTask.LastExecution);
+                PublishCommand(scheduledTask.TypeName, scheduledTask.LastExecution, CommandTrigger.Scheduled);
             }
-
-            _eventAggregator.PublishEvent(new CommandQueuedEvent());
         }
 
         public CommandModel Pop()
@@ -86,7 +107,6 @@ namespace NzbDrone.Core.Messaging.Commands
 
                 if (nextCommand == null)
                 {
-                    _logger.Trace("No queued commands to execute");
                     return null;
                 }
 
@@ -124,47 +144,12 @@ namespace NzbDrone.Core.Messaging.Commands
             command.Status = CommandStatus.Failed;
         }
 
-        private CommandModel PublishCommandInternal<TCommand>(TCommand command) where TCommand : Command
-        {
-            Ensure.That(command, () => command).IsNotNull();
-
-            _logger.Trace("Publishing {0}", command.GetType().Name);
-
-            var existingCommands = _repo.FindCommands(command.Name).Where(c => c.Status == CommandStatus.Queued ||
-                                                                               c.Status == CommandStatus.Started).ToList();
-
-            var existing = existingCommands.SingleOrDefault(c => CommandEqualityComparer.Instance.Equals(c.Body, command));
-
-            if (existing != null)
-            {
-                _logger.Trace("Command is already in progress: {0}", command.GetType().Name);
-
-                //TODO: Return existing command model
-                return existing;
-            }
-
-            //TODO: store command trigger type
-            var commandModel = new CommandModel
-            {
-                Name = command.Name,
-                Body = command,
-                Queued = DateTime.UtcNow,
-                //Trigger = command,
-                Priority = CommandPriority.Normal,
-                Status = CommandStatus.Queued
-            };
-
-            _repo.Insert(commandModel);
-
-            return commandModel;
-        }
-
         private dynamic GetCommand(string commandName)
         {
             commandName = commandName.Split('.').Last();
 
             var commandType = _serviceFactory.GetImplementations(typeof(Command))
-                                             .Single(c => c.Name.Replace("Command", "").Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
+                                             .Single(c => c.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
 
             return Json.Deserialize("{}", commandType);
         }

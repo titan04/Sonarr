@@ -1,6 +1,6 @@
 ﻿using System;
 using NzbDrone.Api.REST;
-using NzbDrone.Core.Messaging.Commands.Tracking;
+using NzbDrone.Core.Messaging.Commands;
 
 namespace NzbDrone.Api.Commands
 {

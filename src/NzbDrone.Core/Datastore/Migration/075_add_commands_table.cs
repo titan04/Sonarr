@@ -9,8 +9,8 @@ namespace NzbDrone.Core.Datastore.Migration
         protected override void MainDbUpgrade()
         {
             Create.TableForModel("Commands")
-                  .WithColumn("CommandName").AsString().NotNullable()
-                  .WithColumn("CommandBody").AsString().NotNullable()
+                  .WithColumn("Name").AsString().NotNullable()
+                  .WithColumn("Body").AsString().NotNullable()
                   .WithColumn("Priority").AsInt32().NotNullable()
                   .WithColumn("Status").AsInt32().NotNullable()
                   .WithColumn("Queued").AsDateTime().NotNullable()
@@ -18,7 +18,7 @@ namespace NzbDrone.Core.Datastore.Migration
                   .WithColumn("Ended").AsDateTime().Nullable()
                   .WithColumn("Duration").AsTime().Nullable()
                   .WithColumn("Exception").AsString().Nullable()
-                  .WithColumn("Manual").AsBoolean();
+                  .WithColumn("Trigger").AsInt32().NotNullable();
         }
     }
 }

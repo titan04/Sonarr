@@ -3,15 +3,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common;
+using NzbDrone.Common.Serializer;
 using NzbDrone.Common.TPL;
 using NzbDrone.Core.Lifecycle;
-using NzbDrone.Core.Messaging.Commands.Events;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.ProgressMessaging;
 
 namespace NzbDrone.Core.Messaging.Commands
 {
-    public class CommandExecutor : IHandle<CommandQueuedEvent>,
+    public class CommandExecutor : //IHandle<CommandQueuedEvent>,
                                    IHandle<ApplicationStartedEvent>,
                                    IHandle<ApplicationShutdownRequested>
     {
@@ -22,13 +22,14 @@ namespace NzbDrone.Core.Messaging.Commands
         private readonly TaskFactory _taskFactory;
 
         private static CancellationTokenSource _cancellationTokenSource;
+        private const int THREAD_LIMIT = 3;
 
         public CommandExecutor(IServiceFactory serviceFactory,
                                ICommandService commandService,
                                IEventAggregator eventAggregator,
                                Logger logger)
         {
-            var scheduler = new LimitedConcurrencyLevelTaskScheduler(3);
+            var scheduler = new LimitedConcurrencyLevelTaskScheduler(THREAD_LIMIT);
 
             _logger = logger;
             _serviceFactory = serviceFactory;
@@ -39,20 +40,23 @@ namespace NzbDrone.Core.Messaging.Commands
 
         private void ExecuteCommands()
         {
-            var command = _commandService.Pop();
-
-            while (command != null)
+            while (!_cancellationTokenSource.IsCancellationRequested)
             {
+                var command = _commandService.Pop();
+
                 try
                 {
-                    ExecuteCommand<Command>(command);
+                    if (command != null)
+                    {
+                        ExecuteCommand(command);
+                    }
                 }
                 catch (Exception ex)
                 {
                     _logger.ErrorException("Error occurred while executing task " + command.Name, ex);
                 }
 
-                command = _commandService.Pop();
+                Thread.Sleep(50);
             }
         }
 
@@ -102,25 +106,30 @@ namespace NzbDrone.Core.Messaging.Commands
             }
         }
 
-        //TODO: right now this will start one thread then another if another job is queued
-        //TODO: start multiple threads when jobs are queued up to our maximum
-        public void Handle(CommandQueuedEvent message)
-        {
-            if (Enum.IsDefined(typeof(TaskCreationOptions), (TaskCreationOptions)0x10))
-            {
-                _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness | (TaskCreationOptions)0x10)
-                            .LogExceptions();
-            }
-            else
-            {
-                _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness)
-                            .LogExceptions();
-            }
-        }
-
+        // TODO: We should use async await (once we get 4.5) or normal Task Continuations on Command processing to prevent blocking the TaskScheduler.
+        //       For now we use TaskCreationOptions 0x10, which is actually .net 4.5 HideScheduler.
+        //       This will detach the scheduler from the thread, causing new Task creating in the command to be executed on the ThreadPool, avoiding a deadlock.
+        //       Please note that the issue only shows itself on mono because since Microsoft .net implementation supports Task inlining on WaitAll.
         public void Handle(ApplicationStartedEvent message)
         {
             _cancellationTokenSource = new CancellationTokenSource();
+
+            if (Enum.IsDefined(typeof(TaskCreationOptions), (TaskCreationOptions)0x10))
+            {
+                for (int i = 0; i < THREAD_LIMIT; i++)
+                {
+                    _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness | (TaskCreationOptions)0x10 | TaskCreationOptions.LongRunning)
+                            .LogExceptions();
+                }
+            }
+            else
+            {
+                for (int i = 0; i < THREAD_LIMIT; i++)
+                {
+                    _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness | TaskCreationOptions.LongRunning)
+                            .LogExceptions();
+                }
+            }
         }
 
         public void Handle(ApplicationShutdownRequested message)

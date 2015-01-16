@@ -4,10 +4,10 @@ using System.Linq;
 using NzbDrone.Api.Extensions;
 using NzbDrone.Api.Mapping;
 using NzbDrone.Api.Validation;
+using NzbDrone.Common;
 using NzbDrone.Common.Composition;
 using NzbDrone.Core.Datastore.Events;
 using NzbDrone.Core.Messaging.Commands;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.ProgressMessaging;
 using NzbDrone.SignalR;
@@ -15,18 +15,18 @@ using NzbDrone.SignalR;
 
 namespace NzbDrone.Api.Commands
 {
-    public class CommandModule : NzbDroneRestModuleWithSignalR<CommandResource, Command>, IHandle<CommandUpdatedEvent>
+    public class CommandModule : NzbDroneRestModuleWithSignalR<CommandResource, CommandModel>, IHandle<CommandUpdatedEvent>
     {
         private readonly ICommandService _commandService;
-        private readonly IContainer _container;
+        private readonly IServiceFactory _serviceFactory;
 
         public CommandModule(ICommandService commandService,
                              IBroadcastSignalRMessage signalRBroadcaster,
-                             IContainer container)
+                             IServiceFactory serviceFactory)
             : base(signalRBroadcaster)
         {
             _commandService = commandService;
-            _container = container;
+            _serviceFactory = serviceFactory;
 
             GetResourceById = GetCommand;
             CreateResource = StartCommand;
@@ -43,12 +43,12 @@ namespace NzbDrone.Api.Commands
         private int StartCommand(CommandResource commandResource)
         {
             var commandType = 
-              _container.GetImplementations(typeof(Command))
+              _serviceFactory.GetImplementations(typeof(Command))
                         .Single(c => c.Name.Replace("Command", "")
                         .Equals(commandResource.Name, StringComparison.InvariantCultureIgnoreCase));
 
             dynamic command = Request.Body.FromJson(commandType);
-            command.Manual = true;
+            command.Trigger = CommandTrigger.Manual;
 
             var trackedCommand = (CommandModel)_commandService.PublishCommand(command);
             return trackedCommand.Id;

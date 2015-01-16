@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using NzbDrone.Core.Datastore;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.Messaging.Commands

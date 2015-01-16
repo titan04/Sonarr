@@ -4,7 +4,6 @@ using NLog;
 using NLog.Targets;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Commands;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.ProgressMessaging

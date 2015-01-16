@@ -13,7 +13,6 @@ using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Instrumentation.Commands;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.MediaFiles.Commands;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.Tv.Commands;
 using NzbDrone.Core.Update.Commands;
@@ -55,7 +54,6 @@ namespace NzbDrone.Core.Jobs
         {
             var defaultTasks = new[]
                 {
-                    new ScheduledTask{ Interval = 1, TypeName = typeof(TrackedCommandCleanupCommand).FullName},
                     new ScheduledTask{ Interval = 1, TypeName = typeof(CheckForFinishedDownloadCommand).FullName},
                     new ScheduledTask{ Interval = 6*60, TypeName = typeof(ApplicationUpdateCommand).FullName},
                     new ScheduledTask{ Interval = 1*60, TypeName = typeof(TrimLogCommand).FullName},

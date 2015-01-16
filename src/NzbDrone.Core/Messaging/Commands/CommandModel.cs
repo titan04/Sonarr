@@ -1,7 +1,6 @@
 ﻿using System;
 using NzbDrone.Common.Messaging;
 using NzbDrone.Core.Datastore;
-using NzbDrone.Core.Messaging.Commands.Tracking;
 
 namespace NzbDrone.Core.Messaging.Commands
 {

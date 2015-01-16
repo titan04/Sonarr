@@ -138,7 +138,7 @@ namespace NzbDrone.Core.Tv
 
                 foreach (var series in allSeries)
                 {
-                    if (message.Manual || _checkIfSeriesShouldBeRefreshed.ShouldRefresh(series))
+                    if (message.Trigger == CommandTrigger.Manual || _checkIfSeriesShouldBeRefreshed.ShouldRefresh(series))
                     {
                         try
                         {

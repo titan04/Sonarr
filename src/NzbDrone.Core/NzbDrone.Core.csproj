@@ -159,6 +159,7 @@
     <Compile Include="Datastore\Converters\Int32Converter.cs" />
     <Compile Include="Datastore\Converters\GuidConverter.cs" />
     <Compile Include="Datastore\Converters\OsPathConverter.cs" />
+    <Compile Include="Datastore\Converters\CommandConverter.cs" />
     <Compile Include="Datastore\Converters\ProviderSettingConverter.cs" />
     <Compile Include="Datastore\Converters\QualityIntConverter.cs" />
     <Compile Include="Datastore\Converters\UtcConverter.cs" />
@@ -597,15 +598,14 @@
     <Compile Include="Messaging\Commands\CommandExecutor.cs" />
     <Compile Include="Messaging\Commands\CommandModel.cs" />
     <Compile Include="Messaging\Commands\CommandPriority.cs" />
-    <Compile Include="Messaging\Events\CommandQueuedEvent.cs" />
+    <Compile Include="Messaging\Commands\CommandNotFoundException.cs" />
+    <Compile Include="Messaging\Commands\CommandStatus.cs" />
     <Compile Include="Messaging\Commands\CommandRepository.cs" />
     <Compile Include="Messaging\Commands\CommandService.cs" />
     <Compile Include="Messaging\Commands\CommandTrigger.cs" />
     <Compile Include="Messaging\Commands\IExecute.cs" />
     <Compile Include="Messaging\Commands\TestCommand.cs" />
     <Compile Include="Messaging\Commands\TestCommandExecutor.cs" />
-    <Compile Include="Messaging\Commands\Tracking\CommandStatus.cs" />
-    <Compile Include="Messaging\Commands\Tracking\TrackedCommandCleanupCommand.cs" />
     <Compile Include="Messaging\Events\CommandExecutedEvent.cs" />
     <Compile Include="Messaging\Events\EventAggregator.cs" />
     <Compile Include="Messaging\Events\IEventAggregator.cs" />

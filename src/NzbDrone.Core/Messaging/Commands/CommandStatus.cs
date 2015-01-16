@@ -1,4 +1,4 @@
-namespace NzbDrone.Core.Messaging.Commands.Tracking
+namespace NzbDrone.Core.Messaging.Commands
 {
     public enum CommandStatus
     {

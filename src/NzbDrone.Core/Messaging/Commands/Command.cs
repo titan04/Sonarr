@@ -14,10 +14,11 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public String Name { get; private set; }
         public DateTime? LastExecutionTime { get; set; }
+        public CommandTrigger Trigger { get; set; }
 
         public Command()
         {
-            Name = GetType().Name.Replace("Command", "");
+            Name = GetType().Name;
         }
     }
 }
