@@ -16,5 +16,6 @@ namespace NzbDrone.Core.Messaging.Commands
         public TimeSpan? Duration { get; set; }
         public string Exception { get; set; }
         public CommandTrigger Trigger { get; set; }
+        public string Message { get; set; }
     }
 }

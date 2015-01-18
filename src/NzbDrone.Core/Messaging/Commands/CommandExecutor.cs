@@ -1,10 +1,8 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common;
-using NzbDrone.Common.Serializer;
 using NzbDrone.Common.TPL;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
@@ -49,7 +47,7 @@ namespace NzbDrone.Core.Messaging.Commands
                 {
                     try
                     {
-                        ExecuteCommand(command.Body, command);
+                        ExecuteCommand((dynamic)command.Body, command);
                     }
                     catch (Exception ex)
                     {
@@ -88,6 +86,7 @@ namespace NzbDrone.Core.Messaging.Commands
             finally
             {
                 BroadcastCommandUpdate(commandModel);
+
                 _eventAggregator.PublishEvent(new CommandExecutedEvent(commandModel));
 
                 if (MappedDiagnosticsContext.Get("CommandId") == commandModel.Id.ToString())

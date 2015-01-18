@@ -18,7 +18,7 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public Command()
         {
-            Name = GetType().Name;
+            Name = GetType().Name.Replace("Command", "");
         }
     }
 }

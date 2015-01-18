@@ -106,7 +106,7 @@ namespace NzbDrone.Core.Jobs
 
         public void Handle(CommandExecutedEvent message)
         {
-            var scheduledTask = _scheduledTaskRepository.All().SingleOrDefault(c => c.TypeName == message.Command.GetType().FullName);
+            var scheduledTask = _scheduledTaskRepository.All().SingleOrDefault(c => c.TypeName == message.Command.Body.GetType().FullName);
 
             if (scheduledTask != null)
             {

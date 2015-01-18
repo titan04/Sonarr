@@ -9,6 +9,13 @@ define(
 
             parse: function (response) {
                 response.name = response.name.toLocaleLowerCase();
+
+                for (var key in response.body) {
+                    response[key] = response.body[key];
+                }
+
+                delete response.body;
+
                 return response;
             },
 

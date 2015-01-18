@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using NzbDrone.Common;
+using NzbDrone.Common.Cache;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.Jobs;
+using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.Messaging.Commands
@@ -23,21 +25,29 @@ namespace NzbDrone.Core.Messaging.Commands
         void Failed(CommandModel command, Exception e);
     }
 
-    public class CommandService : ICommandService
+    public class CommandService : ICommandService, IHandle<ApplicationStartedEvent>
     {
         private readonly ICommandRepository _repo;
         private readonly IServiceFactory _serviceFactory;
         private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
+        private ICached<string> _messageCache; 
+
         private static readonly object Mutex = new object();
 
-        public CommandService(ICommandRepository repo, IServiceFactory serviceFactory, IEventAggregator eventAggregator, Logger logger)
+        public CommandService(ICommandRepository repo, 
+                              IServiceFactory serviceFactory,
+                              IEventAggregator eventAggregator,
+                              ICacheManager cacheManager,
+                              Logger logger)
         {
             _repo = repo;
             _serviceFactory = serviceFactory;
             _eventAggregator = eventAggregator;
             _logger = logger;
+
+            _messageCache = cacheManager.GetCache<string>(GetType());
         }
 
         public CommandModel PublishCommand<TCommand>(TCommand command) where TCommand : Command
@@ -55,11 +65,9 @@ namespace NzbDrone.Core.Messaging.Commands
             {
                 _logger.Trace("Command is already in progress: {0}", command.GetType().Name);
 
-                //TODO: Return existing command model
                 return existing;
             }
 
-            //TODO: store command trigger type
             var commandModel = new CommandModel
             {
                 Name = command.Name,
@@ -82,15 +90,6 @@ namespace NzbDrone.Core.Messaging.Commands
             return command;
         }
 
-        private CommandModel PublishCommand(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
-        {
-            dynamic command = GetCommand(commandName);
-            command.LastExecutionTime = lastExecutionTime;
-            command.Trigger = trigger;
-
-            return PublishCommand(command);
-        }
-
         public void PublishScheduledTasks(List<ScheduledTask> scheduledTasks)
         {
             foreach (var scheduledTask in scheduledTasks)
@@ -111,6 +110,8 @@ namespace NzbDrone.Core.Messaging.Commands
                 }
 
                 nextCommand.Started = DateTime.UtcNow;
+                nextCommand.Status = CommandStatus.Started;
+
                 _repo.Update(nextCommand);
 
                 return nextCommand;
@@ -119,7 +120,7 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public CommandModel Get(int id)
         {
-            return _repo.Get(id);
+            return FindMessage(_repo.Get(id));
         }
 
         public List<CommandModel> GetStarted()
@@ -129,19 +130,29 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void SetMessage(CommandModel command, string message)
         {
-            throw new NotImplementedException();
+            _messageCache.Set(command.Id.ToString(), message);
         }
 
         public void Completed(CommandModel command)
         {
             command.Ended = DateTime.UtcNow;
+            command.Duration = command.Ended.Value.Subtract(command.Started.Value);
             command.Status = CommandStatus.Completed;
+
+            _repo.Update(command);
+
+            _messageCache.Remove(command.Id.ToString());
         }
 
         public void Failed(CommandModel command, Exception e)
         {
             command.Ended = DateTime.UtcNow;
+            command.Duration = command.Ended.Value.Subtract(command.Started.Value);
             command.Status = CommandStatus.Failed;
+
+            _repo.Update(command);
+
+            _messageCache.Remove(command.Id.ToString());
         }
 
         private dynamic GetCommand(string commandName)
@@ -152,6 +163,27 @@ namespace NzbDrone.Core.Messaging.Commands
                                              .Single(c => c.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
 
             return Json.Deserialize("{}", commandType);
+        }
+
+        private CommandModel PublishCommand(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
+        {
+            dynamic command = GetCommand(commandName);
+            command.LastExecutionTime = lastExecutionTime;
+            command.Trigger = trigger;
+
+            return PublishCommand(command);
+        }
+
+        private CommandModel FindMessage(CommandModel command)
+        {
+            command.Message = _messageCache.Find(command.Id.ToString());
+
+            return command;
+        }
+
+        public void Handle(ApplicationStartedEvent message)
+        {
+            _repo.UpdateAborted();
         }
     }
 }
