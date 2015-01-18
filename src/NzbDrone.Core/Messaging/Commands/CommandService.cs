@@ -56,31 +56,35 @@ namespace NzbDrone.Core.Messaging.Commands
 
             _logger.Trace("Publishing {0}", command.GetType().Name);
 
-            var existingCommands = _repo.FindCommands(command.Name).Where(c => c.Status == CommandStatus.Queued ||
-                                                                               c.Status == CommandStatus.Started).ToList();
-
-            var existing = existingCommands.SingleOrDefault(c => CommandEqualityComparer.Instance.Equals(c.Body, command));
-
-            if (existing != null)
+            lock (Mutex)
             {
-                _logger.Trace("Command is already in progress: {0}", command.GetType().Name);
+                var existingCommands = _repo.FindCommands(command.Name).Where(c => c.Status == CommandStatus.Queued ||
+                                                                                   c.Status == CommandStatus.Started)
+                                            .ToList();
 
-                return existing;
+                var existing = existingCommands.SingleOrDefault(c => CommandEqualityComparer.Instance.Equals(c.Body, command));
+
+                if (existing != null)
+                {
+                    _logger.Trace("Command is already in progress: {0}", command.GetType().Name);
+
+                    return existing;
+                }
+
+                var commandModel = new CommandModel
+                                   {
+                                       Name = command.Name,
+                                       Body = command,
+                                       Queued = DateTime.UtcNow,
+                                       Trigger = command.Trigger,
+                                       Priority = CommandPriority.Normal,
+                                       Status = CommandStatus.Queued
+                                   };
+
+                _repo.Insert(commandModel);
+
+                return commandModel;
             }
-
-            var commandModel = new CommandModel
-            {
-                Name = command.Name,
-                Body = command,
-                Queued = DateTime.UtcNow,
-                Trigger = command.Trigger,
-                Priority = CommandPriority.Normal,
-                Status = CommandStatus.Queued
-            };
-
-            _repo.Insert(commandModel);
-
-            return commandModel;
         }
 
         public CommandModel PublishCommand(string commandName)
