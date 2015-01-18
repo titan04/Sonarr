@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -22,7 +23,7 @@ namespace NzbDrone.Core.Messaging.Commands
         private readonly TaskFactory _taskFactory;
 
         private static CancellationTokenSource _cancellationTokenSource;
-        private const int THREAD_LIMIT = 3;
+        private const int THREAD_LIMIT = 1;
 
         public CommandExecutor(IServiceFactory serviceFactory,
                                ICommandService commandService,
@@ -44,58 +45,58 @@ namespace NzbDrone.Core.Messaging.Commands
             {
                 var command = _commandService.Pop();
 
-                try
+                if (command != null)
                 {
-                    if (command != null)
+                    try
                     {
-                        ExecuteCommand(command);
+                        ExecuteCommand(command.Body, command);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.ErrorException("Error occurred while executing task " + command.Name, ex);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.ErrorException("Error occurred while executing task " + command.Name, ex);
-                }
-
+                
                 Thread.Sleep(50);
             }
         }
 
-        private void ExecuteCommand<TCommand>(CommandModel command) where TCommand : Command
+        private void ExecuteCommand<TCommand>(TCommand command, CommandModel commandModel) where TCommand : Command
         {
-            var handlerContract = typeof(IExecute<>).MakeGenericType(command.Body.GetType());
+            var handlerContract = typeof(IExecute<>).MakeGenericType(command.GetType());
             var handler = (IExecute<TCommand>)_serviceFactory.Build(handlerContract);
 
             _logger.Trace("{0} -> {1}", command.GetType().Name, handler.GetType().Name);
 
             try
             {
-                BroadcastCommandUpdate(command);
+                BroadcastCommandUpdate(commandModel);
 
-                if (!MappedDiagnosticsContext.Contains("CommandId") && command.Body.SendUpdatesToClient)
+                if (!MappedDiagnosticsContext.Contains("CommandId") && command.SendUpdatesToClient)
                 {
-                    MappedDiagnosticsContext.Set("CommandId", command.Id.ToString());
+                    MappedDiagnosticsContext.Set("CommandId", commandModel.Id.ToString());
                 }
 
-                handler.Execute((TCommand)command.Body);
-                _commandService.Completed(command);
+                handler.Execute(command);
+                _commandService.Completed(commandModel);
             }
             catch (Exception e)
             {
-                _commandService.Failed(command, e);
+                _commandService.Failed(commandModel, e);
                 throw;
             }
             finally
             {
-                BroadcastCommandUpdate(command);
-                _eventAggregator.PublishEvent(new CommandExecutedEvent(command));
+                BroadcastCommandUpdate(commandModel);
+                _eventAggregator.PublishEvent(new CommandExecutedEvent(commandModel));
 
-                if (MappedDiagnosticsContext.Get("CommandId") == command.Id.ToString())
+                if (MappedDiagnosticsContext.Get("CommandId") == commandModel.Id.ToString())
                 {
                     MappedDiagnosticsContext.Remove("CommandId");
                 }
             }
 
-            _logger.Trace("{0} <- {1} [{2}]", command.GetType().Name, handler.GetType().Name, command.Duration.ToString());
+            _logger.Trace("{0} <- {1} [{2}]", command.GetType().Name, handler.GetType().Name, commandModel.Duration.ToString());
         }
         
         private void BroadcastCommandUpdate(CommandModel command)
