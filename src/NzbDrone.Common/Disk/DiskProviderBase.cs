@@ -109,6 +109,23 @@ namespace NzbDrone.Common.Disk
             }
         }
 
+        public bool FolderWritable(string path)
+        {
+            Ensure.That(path, () => path).IsValidPath();
+
+            try
+            {
+                var testPath = Path.Combine(path, "drone_test.txt");
+                File.WriteAllText(testPath, DateTime.Now.ToString());
+                File.Delete(testPath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public string[] GetDirectories(string path)
         {
             Ensure.That(path, () => path).IsValidPath();
