@@ -102,16 +102,13 @@ namespace NzbDrone.Core.Download
                 };
             }
 
-            if (mustBeWritable)
+            if (mustBeWritable && !_diskProvider.FolderWritable(folder))
             {
-                if (!_diskProvider.FolderWritable(folder))
+                _logger.Error("Folder '{0}' is not writable.", folder);
+                return new NzbDroneValidationFailure(propertyName, "Unable to write to folder")
                 {
-                    _logger.Error("Folder '{0}' is not writable.", folder);
-                    return new NzbDroneValidationFailure(propertyName, "Unable to write to folder")
-                    {
-                        DetailedDescription = "The folder you specified is not writable. Please verify the folder permissions for the user account that is used to execute NzbDrone."
-                    };
-                }
+                    DetailedDescription = "The folder you specified is not writable. Please verify the folder permissions for the user account that is used to execute NzbDrone."
+                };
             }
 
             return null;
