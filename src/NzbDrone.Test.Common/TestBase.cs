@@ -6,6 +6,7 @@ using Moq;
 using NLog;
 using NUnit.Framework;
 using NzbDrone.Common.Cache;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Messaging;
 using NzbDrone.Core.Messaging.Events;
@@ -149,6 +150,21 @@ namespace NzbDrone.Test.Common
                 .Returns(VirtualPath);
 
             TestFolderInfo = Mocker.GetMock<IAppFolderInfo>().Object;
+        }
+
+        protected void WithPartialDiskProvider()
+        {
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.FileExists(It.IsAny<string>()))
+                .Returns<string>(p => File.Exists(p));
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.ReadAllText(It.IsAny<string>()))
+                .Returns<string>(p => File.ReadAllText(p));
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.WriteAllText(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<string, string>((p,t) => File.WriteAllText(p,t));
         }
 
         protected string GetTempFilePath()

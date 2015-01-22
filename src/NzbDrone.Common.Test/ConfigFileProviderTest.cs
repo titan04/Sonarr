@@ -1,6 +1,9 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Disk;
 using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
@@ -141,8 +144,30 @@ namespace NzbDrone.Common.Test
 
             Subject.SaveConfigDictionary(dic);
 
+            Subject.Port.Should().Be(port);
+        }
+
+        [Test]
+        public void SaveDictionary_should_only_save_specified_values()
+        {
+            int port = 20555;
+            int origSslPort = 20551;
+            int sslPort = 20552;
+
+            WithPartialDiskProvider();
+
+            var dic = Subject.GetConfigDictionary();
+            dic["Port"] = port;
+            dic["SslPort"] = origSslPort;
+            Subject.SaveConfigDictionary(dic);
+
+
+            dic = new Dictionary<string, object>();
+            dic["SslPort"] = sslPort;
+            Subject.SaveConfigDictionary(dic);
 
             Subject.Port.Should().Be(port);
+            Subject.SslPort.Should().Be(sslPort);
         }
 
     }
