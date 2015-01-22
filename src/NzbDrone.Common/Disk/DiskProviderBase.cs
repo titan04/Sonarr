@@ -115,8 +115,9 @@ namespace NzbDrone.Common.Disk
 
             try
             {
-                var testPath = Path.Combine(path, "drone_test.txt");
-                File.WriteAllText(testPath, DateTime.Now.ToString());
+                var testPath = Path.Combine(path, "sonarr_write_test.txt");
+                var testContent = string.Format("This file was created to verify if '{0}' is writable. It should've been automatically deleted. Feel free to delete it.", path);
+                File.WriteAllText(testPath, testContent);
                 File.Delete(testPath);
                 return true;
             }

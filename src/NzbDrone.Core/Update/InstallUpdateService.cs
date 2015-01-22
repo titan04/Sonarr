@@ -72,7 +72,7 @@ namespace NzbDrone.Core.Update
                 {
                     if (!_diskProvider.FolderWritable(_appFolderInfo.StartUpFolder))
                     {
-                        throw new ApplicationException("Cannot install update because startup folder is not writable.");
+                        throw new ApplicationException(string.Format("Cannot install update because startup folder '{0}' is not writable by the user '{1}'.", _appFolderInfo.StartUpFolder, Environment.UserName));
                     }
                 }
 
