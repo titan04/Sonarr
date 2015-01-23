@@ -12,17 +12,17 @@ namespace NzbDrone.Core.Download
     {
         private readonly IConfigService _configService;
         private readonly IEpisodeService _episodeService;
-        private readonly ICommandService _commandService;
+        private readonly IManageCommandQueue _commandQueueManager;
         private readonly Logger _logger;
 
         public RedownloadFailedDownloadService(IConfigService configService,
                                                IEpisodeService episodeService,
-                                               ICommandService commandService,
+                                               IManageCommandQueue commandQueueManager,
                                                Logger logger)
         {
             _configService = configService;
             _episodeService = episodeService;
-            _commandService = commandService;
+            _commandQueueManager = commandQueueManager;
             _logger = logger;
         }
 
@@ -38,7 +38,7 @@ namespace NzbDrone.Core.Download
             {
                 _logger.Debug("Failed download only contains one episode, searching again");
 
-                _commandService.PublishCommand(new EpisodeSearchCommand(message.EpisodeIds));
+                _commandQueueManager.Push(new EpisodeSearchCommand(message.EpisodeIds));
 
                 return;
             }
@@ -50,7 +50,7 @@ namespace NzbDrone.Core.Download
             {
                 _logger.Debug("Failed download was entire season, searching again");
 
-                _commandService.PublishCommand(new SeasonSearchCommand
+                _commandQueueManager.Push(new SeasonSearchCommand
                 {
                     SeriesId = message.SeriesId,
                     SeasonNumber = seasonNumber
@@ -61,7 +61,7 @@ namespace NzbDrone.Core.Download
 
             _logger.Debug("Failed download contains multiple episodes, probably a double episode, searching again");
 
-            _commandService.PublishCommand(new EpisodeSearchCommand(message.EpisodeIds));
+            _commandQueueManager.Push(new EpisodeSearchCommand(message.EpisodeIds));
         }
     }
 }

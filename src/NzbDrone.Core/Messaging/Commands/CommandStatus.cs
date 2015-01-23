@@ -7,6 +7,7 @@ namespace NzbDrone.Core.Messaging.Commands
         Completed = 2,
         Failed = 3,
         Aborted = 4,
-        Cancelled = 5
+        Cancelled = 5,
+        Orphaned = 6
     }
 }

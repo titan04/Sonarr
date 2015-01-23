@@ -16,15 +16,15 @@ namespace NzbDrone.Core.Jobs
         IHandle<ApplicationShutdownRequested>
     {
         private readonly ITaskManager _taskManager;
-        private readonly ICommandService _commandService;
+        private readonly IManageCommandQueue _commandQueueManager;
         private readonly Logger _logger;
         private static readonly Timer Timer = new Timer();
         private static CancellationTokenSource _cancellationTokenSource;
 
-        public Scheduler(ITaskManager taskManager, ICommandService commandService, Logger logger)
+        public Scheduler(ITaskManager taskManager, IManageCommandQueue commandQueueManager, Logger logger)
         {
             _taskManager = taskManager;
-            _commandService = commandService;
+            _commandQueueManager = commandQueueManager;
             _logger = logger;
         }
 
@@ -38,7 +38,10 @@ namespace NzbDrone.Core.Jobs
 
                 _logger.Trace("Pending Tasks: {0}", tasks.Count);
 
-                _commandService.PublishScheduledTasks(tasks);
+                foreach (var task in tasks)
+                {
+                    _commandQueueManager.Push(task.TypeName, task.LastExecution, CommandTrigger.Scheduled);
+                }
             }
 
             finally

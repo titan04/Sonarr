@@ -11,13 +11,13 @@ namespace NzbDrone.Core.ProgressMessaging
     public class ProgressMessageTarget : Target, IHandle<ApplicationStartedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
-        private readonly ICommandService _commandService;
+        private readonly IManageCommandQueue _commandQueueManager;
         private static LoggingRule _rule;
 
-        public ProgressMessageTarget(IEventAggregator eventAggregator, ICommandService commandService)
+        public ProgressMessageTarget(IEventAggregator eventAggregator, IManageCommandQueue commandQueueManager)
         {
             _eventAggregator = eventAggregator;
-            _commandService = commandService;
+            _commandQueueManager = commandQueueManager;
         }
 
         protected override void Write(LogEventInfo logEvent)
@@ -26,7 +26,7 @@ namespace NzbDrone.Core.ProgressMessaging
 
             if (IsClientMessage(logEvent, command))
             {
-                _commandService.SetMessage(command, logEvent.FormattedMessage);
+                _commandQueueManager.SetMessage(command, logEvent.FormattedMessage);
                 _eventAggregator.PublishEvent(new CommandUpdatedEvent(command));
             }
         }
@@ -40,7 +40,7 @@ namespace NzbDrone.Core.ProgressMessaging
                 return null;
             }
 
-            return _commandService.Get(Convert.ToInt32(commandId));
+            return _commandQueueManager.Get(Convert.ToInt32(commandId));
         }
 
         private bool IsClientMessage(LogEventInfo logEvent, CommandModel command)

@@ -41,7 +41,7 @@
 //        {
 //            var commandA = new CommandA();
 //
-//            Subject.PublishCommand(commandA);
+//            Subject.Push(commandA);
 //
 //            _executorA.Verify(c => c.Execute(commandA), Times.Once());
 //        }
@@ -52,7 +52,7 @@
 //            Mocker.GetMock<IServiceFactory>().Setup(c => c.GetImplementations(typeof(Command)))
 //                  .Returns(new List<Type> { typeof(CommandA), typeof(CommandB) });
 //
-//            Subject.PublishCommand(typeof(CommandA).FullName);
+//            Subject.Push(typeof(CommandA).FullName);
 //            _executorA.Verify(c => c.Execute(It.IsAny<CommandA>()), Times.Once());
 //        }
 //
@@ -62,7 +62,7 @@
 //        {
 //            var commandA = new CommandA();
 //
-//            Subject.PublishCommand(commandA);
+//            Subject.Push(commandA);
 //
 //            _executorA.Verify(c => c.Execute(commandA), Times.Once());
 //            _executorB.Verify(c => c.Execute(It.IsAny<CommandB>()), Times.Never());
@@ -76,7 +76,7 @@
 //            _executorA.Setup(c => c.Execute(It.IsAny<CommandA>()))
 //                       .Throws(new NotImplementedException());
 //
-//            Assert.Throws<NotImplementedException>(() => Subject.PublishCommand(commandA));
+//            Assert.Throws<NotImplementedException>(() => Subject.Push(commandA));
 //        }
 //
 //
@@ -88,7 +88,7 @@
 //            _executorA.Setup(c => c.Execute(It.IsAny<CommandA>()))
 //                       .Throws(new NotImplementedException());
 //
-//            Assert.Throws<NotImplementedException>(() => Subject.PublishCommand(commandA));
+//            Assert.Throws<NotImplementedException>(() => Subject.Push(commandA));
 //
 //            VerifyEventPublished<CommandExecutedEvent>();
 //        }
@@ -97,7 +97,7 @@
 //        public void should_publish_executed_event_on_success()
 //        {
 //            var commandA = new CommandA();
-//            Subject.PublishCommand(commandA);
+//            Subject.Push(commandA);
 //
 //            VerifyEventPublished<CommandExecutedEvent>();
 //        }

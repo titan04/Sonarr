@@ -1,9 +1,7 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using NLog;
 using NzbDrone.Common;
-using NzbDrone.Common.TPL;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 using NzbDrone.Core.ProgressMessaging;
@@ -16,46 +14,52 @@ namespace NzbDrone.Core.Messaging.Commands
     {
         private readonly Logger _logger;
         private readonly IServiceFactory _serviceFactory;
-        private readonly ICommandService _commandService;
+        private readonly IManageCommandQueue _commandQueueManager;
         private readonly IEventAggregator _eventAggregator;
-        private readonly TaskFactory _taskFactory;
 
         private static CancellationTokenSource _cancellationTokenSource;
-        private const int THREAD_LIMIT = 1;
+        private const int THREAD_LIMIT = 3;
 
         public CommandExecutor(IServiceFactory serviceFactory,
-                               ICommandService commandService,
+                               IManageCommandQueue commandQueueManager,
                                IEventAggregator eventAggregator,
                                Logger logger)
         {
-            var scheduler = new LimitedConcurrencyLevelTaskScheduler(THREAD_LIMIT);
-
             _logger = logger;
             _serviceFactory = serviceFactory;
-            _commandService = commandService;
+            _commandQueueManager = commandQueueManager;
             _eventAggregator = eventAggregator;
-            _taskFactory = new TaskFactory(scheduler);
         }
 
         private void ExecuteCommands()
         {
-            while (!_cancellationTokenSource.IsCancellationRequested)
+            try
             {
-                var command = _commandService.Pop();
-
-                if (command != null)
+                while (!_cancellationTokenSource.IsCancellationRequested)
                 {
-                    try
+                    var command = _commandQueueManager.Pop();
+
+                    if (command != null)
                     {
-                        ExecuteCommand((dynamic)command.Body, command);
+                        try
+                        {
+                            ExecuteCommand((dynamic)command.Body, command);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.ErrorException("Error occurred while executing task " + command.Name, ex);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.ErrorException("Error occurred while executing task " + command.Name, ex);
+                        Thread.Sleep(50);
                     }
                 }
-                
-                Thread.Sleep(50);
+            }
+            catch (ThreadAbortException ex)
+            {
+                _logger.ErrorException(ex.Message, ex);
+                Thread.ResetAbort();
             }
         }
 
@@ -76,11 +80,11 @@ namespace NzbDrone.Core.Messaging.Commands
                 }
 
                 handler.Execute(command);
-                _commandService.Completed(commandModel);
+                _commandQueueManager.Completed(commandModel);
             }
             catch (Exception e)
             {
-                _commandService.Failed(commandModel, e);
+                _commandQueueManager.Failed(commandModel, e);
                 throw;
             }
             finally
@@ -106,29 +110,14 @@ namespace NzbDrone.Core.Messaging.Commands
             }
         }
 
-        // TODO: We should use async await (once we get 4.5) or normal Task Continuations on Command processing to prevent blocking the TaskScheduler.
-        //       For now we use TaskCreationOptions 0x10, which is actually .net 4.5 HideScheduler.
-        //       This will detach the scheduler from the thread, causing new Task creating in the command to be executed on the ThreadPool, avoiding a deadlock.
-        //       Please note that the issue only shows itself on mono because since Microsoft .net implementation supports Task inlining on WaitAll.
         public void Handle(ApplicationStartedEvent message)
         {
             _cancellationTokenSource = new CancellationTokenSource();
 
-            if (Enum.IsDefined(typeof(TaskCreationOptions), (TaskCreationOptions)0x10))
+            for (int i = 0; i < THREAD_LIMIT; i++)
             {
-                for (int i = 0; i < THREAD_LIMIT; i++)
-                {
-                    _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness | (TaskCreationOptions)0x10 | TaskCreationOptions.LongRunning)
-                            .LogExceptions();
-                }
-            }
-            else
-            {
-                for (int i = 0; i < THREAD_LIMIT; i++)
-                {
-                    _taskFactory.StartNew(ExecuteCommands, TaskCreationOptions.PreferFairness | TaskCreationOptions.LongRunning)
-                            .LogExceptions();
-                }
+                var thread = new Thread(ExecuteCommands);
+                thread.Start();
             }
         }
 

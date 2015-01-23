@@ -17,15 +17,15 @@ namespace NzbDrone.Api.Commands
 {
     public class CommandModule : NzbDroneRestModuleWithSignalR<CommandResource, CommandModel>, IHandle<CommandUpdatedEvent>
     {
-        private readonly ICommandService _commandService;
+        private readonly IManageCommandQueue _commandQueueManager;
         private readonly IServiceFactory _serviceFactory;
 
-        public CommandModule(ICommandService commandService,
+        public CommandModule(IManageCommandQueue commandQueueManager,
                              IBroadcastSignalRMessage signalRBroadcaster,
                              IServiceFactory serviceFactory)
             : base(signalRBroadcaster)
         {
-            _commandService = commandService;
+            _commandQueueManager = commandQueueManager;
             _serviceFactory = serviceFactory;
 
             GetResourceById = GetCommand;
@@ -37,7 +37,7 @@ namespace NzbDrone.Api.Commands
 
         private CommandResource GetCommand(int id)
         {
-            return _commandService.Get(id).InjectTo<CommandResource>();
+            return _commandQueueManager.Get(id).InjectTo<CommandResource>();
         }
 
         private int StartCommand(CommandResource commandResource)
@@ -50,13 +50,13 @@ namespace NzbDrone.Api.Commands
             dynamic command = Request.Body.FromJson(commandType);
             command.Trigger = CommandTrigger.Manual;
 
-            var trackedCommand = (CommandModel)_commandService.PublishCommand(command);
+            var trackedCommand = (CommandModel)_commandQueueManager.Push(command);
             return trackedCommand.Id;
         }
 
         private List<CommandResource> GetAllCommands()
         {
-            return ToListResource(_commandService.GetStarted());
+            return ToListResource(_commandQueueManager.GetStarted());
         }
 
         public void Handle(CommandUpdatedEvent message)

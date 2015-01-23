@@ -12,11 +12,11 @@ using NzbDrone.Core.Messaging.Events;
 
 namespace NzbDrone.Core.Messaging.Commands
 {
-    public interface ICommandService
+    public interface IManageCommandQueue
     {
-        CommandModel PublishCommand<TCommand>(TCommand command) where TCommand : Command;
-        CommandModel PublishCommand(string commandName);
-        void PublishScheduledTasks(List<ScheduledTask> commands);
+        CommandModel Push<TCommand>(TCommand command) where TCommand : Command;
+        CommandModel Push(string commandName);
+        CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified);
         CommandModel Pop();
         CommandModel Get(int id);
         List<CommandModel> GetStarted(); 
@@ -25,32 +25,29 @@ namespace NzbDrone.Core.Messaging.Commands
         void Failed(CommandModel command, Exception e);
     }
 
-    public class CommandService : ICommandService, IHandle<ApplicationStartedEvent>
+    public class CommandQueueManager : IManageCommandQueue, IHandle<ApplicationStartedEvent>
     {
         private readonly ICommandRepository _repo;
         private readonly IServiceFactory _serviceFactory;
-        private readonly IEventAggregator _eventAggregator;
         private readonly Logger _logger;
 
         private ICached<string> _messageCache; 
 
         private static readonly object Mutex = new object();
 
-        public CommandService(ICommandRepository repo, 
+        public CommandQueueManager(ICommandRepository repo, 
                               IServiceFactory serviceFactory,
-                              IEventAggregator eventAggregator,
                               ICacheManager cacheManager,
                               Logger logger)
         {
             _repo = repo;
             _serviceFactory = serviceFactory;
-            _eventAggregator = eventAggregator;
             _logger = logger;
 
             _messageCache = cacheManager.GetCache<string>(GetType());
         }
 
-        public CommandModel PublishCommand<TCommand>(TCommand command) where TCommand : Command
+        public CommandModel Push<TCommand>(TCommand command) where TCommand : Command
         {
             Ensure.That(command, () => command).IsNotNull();
 
@@ -58,10 +55,7 @@ namespace NzbDrone.Core.Messaging.Commands
 
             lock (Mutex)
             {
-                var existingCommands = _repo.FindCommands(command.Name).Where(c => c.Status == CommandStatus.Queued ||
-                                                                                   c.Status == CommandStatus.Started)
-                                            .ToList();
-
+                var existingCommands = _repo.FindQueuedOrStarted(command.Name);
                 var existing = existingCommands.SingleOrDefault(c => CommandEqualityComparer.Instance.Equals(c.Body, command));
 
                 if (existing != null)
@@ -75,7 +69,7 @@ namespace NzbDrone.Core.Messaging.Commands
                                    {
                                        Name = command.Name,
                                        Body = command,
-                                       Queued = DateTime.UtcNow,
+                                       QueuedAt = DateTime.UtcNow,
                                        Trigger = command.Trigger,
                                        Priority = CommandPriority.Normal,
                                        Status = CommandStatus.Queued
@@ -87,33 +81,34 @@ namespace NzbDrone.Core.Messaging.Commands
             }
         }
 
-        public CommandModel PublishCommand(string commandName)
+        public CommandModel Push(string commandName)
         {
-            var command = PublishCommand(commandName, null);
+            var command = Push(commandName, null);
 
             return command;
         }
 
-        public void PublishScheduledTasks(List<ScheduledTask> scheduledTasks)
+        public CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
         {
-            foreach (var scheduledTask in scheduledTasks)
-            {
-                PublishCommand(scheduledTask.TypeName, scheduledTask.LastExecution, CommandTrigger.Scheduled);
-            }
+            dynamic command = GetCommand(commandName);
+            command.LastExecutionTime = lastExecutionTime;
+            command.Trigger = trigger;
+
+            return Push(command);
         }
 
         public CommandModel Pop()
         {
             lock (Mutex)
             {
-                var nextCommand = _repo.Queued().OrderByDescending(c => c.Priority).ThenBy(c => c.Queued).FirstOrDefault();
+                var nextCommand = _repo.Next();
 
                 if (nextCommand == null)
                 {
                     return null;
                 }
 
-                nextCommand.Started = DateTime.UtcNow;
+                nextCommand.StartedAt = DateTime.UtcNow;
                 nextCommand.Status = CommandStatus.Started;
 
                 _repo.Update(nextCommand);
@@ -139,8 +134,8 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Completed(CommandModel command)
         {
-            command.Ended = DateTime.UtcNow;
-            command.Duration = command.Ended.Value.Subtract(command.Started.Value);
+            command.EndedAt = DateTime.UtcNow;
+            command.Duration = command.EndedAt.Value.Subtract(command.StartedAt.Value);
             command.Status = CommandStatus.Completed;
 
             _repo.Update(command);
@@ -150,8 +145,8 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Failed(CommandModel command, Exception e)
         {
-            command.Ended = DateTime.UtcNow;
-            command.Duration = command.Ended.Value.Subtract(command.Started.Value);
+            command.EndedAt = DateTime.UtcNow;
+            command.Duration = command.EndedAt.Value.Subtract(command.StartedAt.Value);
             command.Status = CommandStatus.Failed;
 
             _repo.Update(command);
@@ -169,15 +164,6 @@ namespace NzbDrone.Core.Messaging.Commands
             return Json.Deserialize("{}", commandType);
         }
 
-        private CommandModel PublishCommand(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
-        {
-            dynamic command = GetCommand(commandName);
-            command.LastExecutionTime = lastExecutionTime;
-            command.Trigger = trigger;
-
-            return PublishCommand(command);
-        }
-
         private CommandModel FindMessage(CommandModel command)
         {
             command.Message = _messageCache.Find(command.Id.ToString());
@@ -187,7 +173,7 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Handle(ApplicationStartedEvent message)
         {
-            _repo.UpdateAborted();
+            _repo.OrphanStarted();
         }
     }
 }

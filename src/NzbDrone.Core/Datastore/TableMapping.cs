@@ -129,6 +129,8 @@ namespace NzbDrone.Core.Datastore
             MapRepository.Instance.RegisterTypeConverter(typeof(OsPath), new OsPathConverter());
             MapRepository.Instance.RegisterTypeConverter(typeof(Guid), new GuidConverter());
             MapRepository.Instance.RegisterTypeConverter(typeof(Command), new CommandConverter());
+            MapRepository.Instance.RegisterTypeConverter(typeof(TimeSpan), new TimeSpanConverter());
+            MapRepository.Instance.RegisterTypeConverter(typeof(TimeSpan?), new TimeSpanConverter());
         }
 
         private static void RegisterProviderSettingConverter()

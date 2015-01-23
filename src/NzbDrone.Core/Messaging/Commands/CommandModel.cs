@@ -10,9 +10,9 @@ namespace NzbDrone.Core.Messaging.Commands
         public Command Body { get; set; }
         public CommandPriority Priority { get; set; }
         public CommandStatus Status { get; set; }
-        public DateTime Queued { get; set; }
-        public DateTime? Started { get; set; }
-        public DateTime? Ended { get; set; }
+        public DateTime QueuedAt { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime? EndedAt { get; set; }
         public TimeSpan? Duration { get; set; }
         public string Exception { get; set; }
         public CommandTrigger Trigger { get; set; }

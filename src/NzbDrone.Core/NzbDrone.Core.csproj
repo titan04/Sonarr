@@ -156,6 +156,7 @@
     <Compile Include="Datastore\Converters\BooleanIntConverter.cs" />
     <Compile Include="Datastore\Converters\EmbeddedDocumentConverter.cs" />
     <Compile Include="Datastore\Converters\EnumIntConverter.cs" />
+    <Compile Include="Datastore\Converters\TimeSpanConverter.cs" />
     <Compile Include="Datastore\Converters\Int32Converter.cs" />
     <Compile Include="Datastore\Converters\GuidConverter.cs" />
     <Compile Include="Datastore\Converters\OsPathConverter.cs" />
@@ -236,7 +237,7 @@
     <Compile Include="Datastore\Migration\060_remove_enable_from_indexers.cs" />
     <Compile Include="Datastore\Migration\062_convert_quality_models.cs" />
     <Compile Include="Datastore\Migration\065_make_scene_numbering_nullable.cs" />
-    <Compile Include="Datastore\Migration\075_add_commands_table.cs" />
+    <Compile Include="Datastore\Migration\076_add_commands_table.cs" />
     <Compile Include="Datastore\Migration\068_add_release_restrictions.cs" />
     <Compile Include="Datastore\Migration\066_add_tags.cs" />
     <Compile Include="Datastore\Migration\067_add_added_to_series.cs" />
@@ -601,7 +602,7 @@
     <Compile Include="Messaging\Commands\CommandNotFoundException.cs" />
     <Compile Include="Messaging\Commands\CommandStatus.cs" />
     <Compile Include="Messaging\Commands\CommandRepository.cs" />
-    <Compile Include="Messaging\Commands\CommandService.cs" />
+    <Compile Include="Messaging\Commands\CommandQueueManager.cs" />
     <Compile Include="Messaging\Commands\CommandTrigger.cs" />
     <Compile Include="Messaging\Commands\IExecute.cs" />
     <Compile Include="Messaging\Commands\TestCommand.cs" />
