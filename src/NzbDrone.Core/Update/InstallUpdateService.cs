@@ -186,7 +186,7 @@ namespace NzbDrone.Core.Update
             if (_appFolderInfo.StartUpFolder.IsParentPath(_appFolderInfo.AppDataFolder) ||
                 _appFolderInfo.StartUpFolder.PathEquals(_appFolderInfo.AppDataFolder))
             {
-                throw new NotSupportedException("Update will cause AppData to be deleted, correct you configuration before proceeding");
+                throw new UpdateFailedException("Update will cause AppData to be deleted, correct you configuration before proceeding");
             }
         }
 
@@ -205,6 +205,10 @@ namespace NzbDrone.Core.Update
             catch (UpdateVerificationFailedException ex)
             {
                 message.Failed(ex, "Update verification failed");
+            }
+            catch (UpdateFailedException ex)
+            {
+                message.Failed(ex);
             }
         }
 
