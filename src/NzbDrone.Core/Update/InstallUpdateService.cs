@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NLog;
@@ -103,6 +104,8 @@ namespace NzbDrone.Core.Update
                 _archiveService.Extract(packageDestination, updateSandboxFolder);
                 _logger.Info("Update package extracted successfully");
 
+                SwitchUpdatePackageBranch(updatePackage);
+
                 _backupService.Backup(BackupType.Update);
 
                 if (OsInfo.IsNotWindows && _configFileProvider.UpdateMechanism == UpdateMechanism.Script)
@@ -126,6 +129,25 @@ namespace NzbDrone.Core.Update
             {
                 _logger.ErrorException("Update process failed", ex);
                 throw;
+            }
+        }
+
+        private void SwitchUpdatePackageBranch(UpdatePackage package)
+        {
+            if (package.Branch != _configFileProvider.Branch)
+            {
+                try
+                {
+                    _logger.Info("Branch [{0}] is being redirected to [{1}]]", _configFileProvider.Branch, package.Branch);
+                    var config = new Dictionary<string, object>();
+                    config["Branch"] = package.Branch;
+                    _configFileProvider.SaveConfigDictionary(config);
+                }
+                catch (Exception e)
+                {
+                    _logger.ErrorException("Couldn't save the branch redirect.", e);
+                }
+
             }
         }
 
