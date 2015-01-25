@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using NLog;
 using NzbDrone.Common;
 using NzbDrone.Common.Disk;
@@ -10,13 +11,11 @@ using NzbDrone.Common.Instrumentation.Extensions;
 using NzbDrone.Common.Processes;
 using NzbDrone.Core.Backup;
 using NzbDrone.Core.Configuration;
-using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Update.Commands;
 
 namespace NzbDrone.Core.Update
 {
-
     public class InstallUpdateService : IExecute<ApplicationUpdateCommand>, IExecute<InstallUpdateCommand>
     {
         private readonly ICheckUpdateService _checkUpdateService;
@@ -62,7 +61,7 @@ namespace NzbDrone.Core.Update
             _logger = logger;
         }
 
-        private bool InstallUpdate(UpdatePackage updatePackage)
+        private void InstallUpdate(UpdatePackage updatePackage)
         {
             try
             {
@@ -72,7 +71,7 @@ namespace NzbDrone.Core.Update
                 {
                     if (!_diskProvider.FolderWritable(_appFolderInfo.StartUpFolder))
                     {
-                        throw new ApplicationException(string.Format("Cannot install update because startup folder '{0}' is not writable by the user '{1}'.", _appFolderInfo.StartUpFolder, Environment.UserName));
+                        throw new UpdateFolderNotWritableException("Cannot install update because startup folder '{0}' is not writable by the user '{1}'.", _appFolderInfo.StartUpFolder, Environment.UserName);
                     }
                 }
 
@@ -109,7 +108,7 @@ namespace NzbDrone.Core.Update
                 if (OsInfo.IsNotWindows && _configFileProvider.UpdateMechanism == UpdateMechanism.Script)
                 {
                     InstallUpdateWithScript(updateSandboxFolder);
-                    return true;
+                    return;
                 }
 
                 _logger.Info("Preparing client");
@@ -117,16 +116,16 @@ namespace NzbDrone.Core.Update
                                             updateSandboxFolder);
 
                 _logger.Info("Starting update client {0}", _appFolderInfo.GetUpdateClientExePath());
-                _logger.ProgressInfo("NzbDrone will restart shortly.");
+                _logger.ProgressInfo("Sonarr will restart shortly.");
 
                 _processProvider.Start(_appFolderInfo.GetUpdateClientExePath(), GetUpdaterArgs(updateSandboxFolder));
 
-                return true;
+                return;
             }
-            catch (Exception ex)
+            catch (UpdateFailedException ex)
             {
                 _logger.ErrorException("Update process failed", ex);
-                return false;
+                throw;
             }
         }
 
@@ -169,6 +168,24 @@ namespace NzbDrone.Core.Update
             }
         }
 
+        private void ExecuteInstallUpdate(Command message, UpdatePackage package)
+        {
+            try
+            {
+                InstallUpdate(package);
+
+                message.Completed("Restarting Sonarr to apply updates");
+            }
+            catch (UpdateFolderNotWritableException ex)
+            {
+                message.Failed(ex, string.Format("Startup folder not writable by user '{0}'", Environment.UserName));
+            }
+            catch (UpdateVerificationFailedException ex)
+            {
+                message.Failed(ex, "Update verification failed");
+            }
+        }
+
         public void Execute(ApplicationUpdateCommand message)
         {
             _logger.ProgressDebug("Checking for updates");
@@ -176,18 +193,20 @@ namespace NzbDrone.Core.Update
 
             if (latestAvailable != null)
             {
-                InstallUpdate(latestAvailable);
+                ExecuteInstallUpdate(message, latestAvailable);
             }
         }
 
         public void Execute(InstallUpdateCommand message)
         {
-            var success = InstallUpdate(message.UpdatePackage);
+            var latestAvailable = _checkUpdateService.AvailableUpdate();
 
-            if (!success)
+            if (latestAvailable == null || latestAvailable.Hash != message.UpdatePackage.Hash)
             {
-                throw new NzbDroneClientException(System.Net.HttpStatusCode.Conflict, "Failed to install update");
+                throw new ApplicationException("Unknown or invalid update specified");
             }
+
+            ExecuteInstallUpdate(message, latestAvailable);
         }
     }
 }
