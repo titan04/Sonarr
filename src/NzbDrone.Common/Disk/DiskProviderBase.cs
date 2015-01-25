@@ -121,8 +121,9 @@ namespace NzbDrone.Common.Disk
                 File.Delete(testPath);
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                Logger.Trace("Directory '{0}' isn't writable. {1}", path, e.Message);
                 return false;
             }
         }
