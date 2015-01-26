@@ -64,90 +64,80 @@ namespace NzbDrone.Core.Update
 
         private void InstallUpdate(UpdatePackage updatePackage)
         {
-            try
+            EnsureAppDataSafety();
+
+            if (OsInfo.IsWindows || _configFileProvider.UpdateMechanism != UpdateMechanism.Script)
             {
-                EnsureAppDataSafety();
-
-                if (OsInfo.IsWindows || _configFileProvider.UpdateMechanism != UpdateMechanism.Script)
+                if (!_diskProvider.FolderWritable(_appFolderInfo.StartUpFolder))
                 {
-                    if (!_diskProvider.FolderWritable(_appFolderInfo.StartUpFolder))
-                    {
-                        throw new UpdateFolderNotWritableException("Cannot install update because startup folder '{0}' is not writable by the user '{1}'.", _appFolderInfo.StartUpFolder, Environment.UserName);
-                    }
+                    throw new UpdateFolderNotWritableException("Cannot install update because startup folder '{0}' is not writable by the user '{1}'.", _appFolderInfo.StartUpFolder, Environment.UserName);
                 }
+            }
 
-                var updateSandboxFolder = _appFolderInfo.GetUpdateSandboxFolder();
+            var updateSandboxFolder = _appFolderInfo.GetUpdateSandboxFolder();
 
-                var packageDestination = Path.Combine(updateSandboxFolder, updatePackage.FileName);
+            var packageDestination = Path.Combine(updateSandboxFolder, updatePackage.FileName);
 
-                if (_diskProvider.FolderExists(updateSandboxFolder))
-                {
-                    _logger.Info("Deleting old update files");
-                    _diskProvider.DeleteFolder(updateSandboxFolder, true);
-                }
+            if (_diskProvider.FolderExists(updateSandboxFolder))
+            {
+                _logger.Info("Deleting old update files");
+                _diskProvider.DeleteFolder(updateSandboxFolder, true);
+            }
 
-                _logger.ProgressInfo("Downloading update {0}", updatePackage.Version);
-                _logger.Debug("Downloading update package from [{0}] to [{1}]", updatePackage.Url, packageDestination);
-                _httpClient.DownloadFile(updatePackage.Url, packageDestination);
+            _logger.ProgressInfo("Downloading update {0}", updatePackage.Version);
+            _logger.Debug("Downloading update package from [{0}] to [{1}]", updatePackage.Url, packageDestination);
+            _httpClient.DownloadFile(updatePackage.Url, packageDestination);
 
-                _logger.ProgressInfo("Verifying update package");
+            _logger.ProgressInfo("Verifying update package");
 
-                if (!_updateVerifier.Verify(updatePackage, packageDestination))
-                {
-                    _logger.Error("Update package is invalid");
-                    throw new UpdateVerificationFailedException("Update file '{0}' is invalid", packageDestination);
-                }
+            if (!_updateVerifier.Verify(updatePackage, packageDestination))
+            {
+                _logger.Error("Update package is invalid");
+                throw new UpdateVerificationFailedException("Update file '{0}' is invalid", packageDestination);
+            }
 
-                _logger.Info("Update package verified successfully");
+            _logger.Info("Update package verified successfully");
 
-                _logger.ProgressInfo("Extracting Update package");
-                _archiveService.Extract(packageDestination, updateSandboxFolder);
-                _logger.Info("Update package extracted successfully");
+            _logger.ProgressInfo("Extracting Update package");
+            _archiveService.Extract(packageDestination, updateSandboxFolder);
+            _logger.Info("Update package extracted successfully");
 
-                SwitchUpdatePackageBranch(updatePackage);
+            EnsureValidBranch(updatePackage);
 
-                _backupService.Backup(BackupType.Update);
+            _backupService.Backup(BackupType.Update);
 
-                if (OsInfo.IsNotWindows && _configFileProvider.UpdateMechanism == UpdateMechanism.Script)
-                {
-                    InstallUpdateWithScript(updateSandboxFolder);
-                    return;
-                }
-
-                _logger.Info("Preparing client");
-                _diskProvider.MoveFolder(_appFolderInfo.GetUpdateClientFolder(),
-                                            updateSandboxFolder);
-
-                _logger.Info("Starting update client {0}", _appFolderInfo.GetUpdateClientExePath());
-                _logger.ProgressInfo("Sonarr will restart shortly.");
-
-                _processProvider.Start(_appFolderInfo.GetUpdateClientExePath(), GetUpdaterArgs(updateSandboxFolder));
-
+            if (OsInfo.IsNotWindows && _configFileProvider.UpdateMechanism == UpdateMechanism.Script)
+            {
+                InstallUpdateWithScript(updateSandboxFolder);
                 return;
             }
-            catch (UpdateFailedException ex)
-            {
-                _logger.ErrorException("Update process failed", ex);
-                throw;
-            }
+
+            _logger.Info("Preparing client");
+            _diskProvider.MoveFolder(_appFolderInfo.GetUpdateClientFolder(),
+                                        updateSandboxFolder);
+
+            _logger.Info("Starting update client {0}", _appFolderInfo.GetUpdateClientExePath());
+            _logger.ProgressInfo("Sonarr will restart shortly.");
+
+            _processProvider.Start(_appFolderInfo.GetUpdateClientExePath(), GetUpdaterArgs(updateSandboxFolder));
         }
 
-        private void SwitchUpdatePackageBranch(UpdatePackage package)
+        private void EnsureValidBranch(UpdatePackage package)
         {
-            if (package.Branch != _configFileProvider.Branch)
+            var currentBranch = _configFileProvider.Branch;
+            if (package.Branch != currentBranch)
             {
                 try
                 {
-                    _logger.Info("Branch [{0}] is being redirected to [{1}]]", _configFileProvider.Branch, package.Branch);
+                    _logger.Info("Branch [{0}] is being redirected to [{1}]]", currentBranch, package.Branch);
                     var config = new Dictionary<string, object>();
                     config["Branch"] = package.Branch;
                     _configFileProvider.SaveConfigDictionary(config);
                 }
                 catch (Exception e)
                 {
-                    _logger.ErrorException("Couldn't save the branch redirect.", e);
+                    _logger.ErrorException(string.Format("Couldn't change the branch from [{0}] to [{1}].", currentBranch, package.Branch), e);
                 }
-
             }
         }
 
@@ -186,7 +176,7 @@ namespace NzbDrone.Core.Update
             if (_appFolderInfo.StartUpFolder.IsParentPath(_appFolderInfo.AppDataFolder) ||
                 _appFolderInfo.StartUpFolder.PathEquals(_appFolderInfo.AppDataFolder))
             {
-                throw new UpdateFailedException("Update will cause AppData to be deleted, correct you configuration before proceeding");
+                throw new UpdateFailedException("You Sonarr configuration ('{0}') is being stored in application folder ('{1}') which will cause data lost during the upgrade. Please remove any symlinks or redirects before trying again.", _appFolderInfo.AppDataFolder, _appFolderInfo.StartUpFolder);
             }
         }
 
@@ -200,14 +190,17 @@ namespace NzbDrone.Core.Update
             }
             catch (UpdateFolderNotWritableException ex)
             {
+                _logger.ErrorException("Update process failed", ex);
                 message.Failed(ex, string.Format("Startup folder not writable by user '{0}'", Environment.UserName));
             }
             catch (UpdateVerificationFailedException ex)
             {
-                message.Failed(ex, "Update verification failed");
+                _logger.ErrorException("Update process failed", ex);
+                message.Failed(ex, "Downloaded update package is corrupt");
             }
             catch (UpdateFailedException ex)
             {
+                _logger.ErrorException("Update process failed", ex);
                 message.Failed(ex);
             }
         }
