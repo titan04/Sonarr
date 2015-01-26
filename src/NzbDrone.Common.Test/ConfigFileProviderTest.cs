@@ -15,6 +15,8 @@ namespace NzbDrone.Common.Test
 
     public class ConfigFileProviderTest : TestBase<ConfigFileProvider>
     {
+        private string _configFileContents;
+
         [SetUp]
         public void SetUp()
         {
@@ -22,8 +24,24 @@ namespace NzbDrone.Common.Test
 
             var configFile = Mocker.Resolve<IAppFolderInfo>().GetConfigPath();
 
-            if (File.Exists(configFile))
-                File.Delete(configFile);
+            _configFileContents = null;
+
+            WithMockConfigFile(configFile);
+        }
+
+        protected void WithMockConfigFile(string configFile)
+        {
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.FileExists(configFile))
+                .Returns<string>(p => _configFileContents != null);
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.ReadAllText(configFile))
+                .Returns<string>(p => _configFileContents);
+
+            Mocker.GetMock<IDiskProvider>()
+                .Setup(v => v.WriteAllText(configFile, It.IsAny<string>()))
+                .Callback<string, string>((p, t) => _configFileContents = t);
         }
 
         [Test]
@@ -153,8 +171,6 @@ namespace NzbDrone.Common.Test
             int port = 20555;
             int origSslPort = 20551;
             int sslPort = 20552;
-
-            WithPartialDiskProvider();
 
             var dic = Subject.GetConfigDictionary();
             dic["Port"] = port;
