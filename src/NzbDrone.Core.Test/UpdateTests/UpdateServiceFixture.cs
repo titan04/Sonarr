@@ -289,7 +289,7 @@ namespace NzbDrone.Core.Test.UpdateTests
 
             var updateArchive = Path.Combine(_sandboxFolder, _updatePackage.FileName);
 
-            Subject.Execute(new InstallUpdateCommand() { UpdatePackage = _updatePackage });
+            Subject.Execute(new ApplicationUpdateCommand());
 
             Mocker.GetMock<IHttpClient>().Verify(c => c.DownloadFile(_updatePackage.Url, updateArchive), Times.Never());
             ExceptionVerification.ExpectedErrors(1);
@@ -300,7 +300,7 @@ namespace NzbDrone.Core.Test.UpdateTests
         {
             _updatePackage.Branch = "fake";
 
-            Subject.Execute(new InstallUpdateCommand() { UpdatePackage = _updatePackage });
+            Subject.Execute(new ApplicationUpdateCommand());
 
             Mocker.GetMock<IConfigFileProvider>()
                   .Verify(v => v.SaveConfigDictionary(It.Is<Dictionary<string, object>>(d => d.ContainsKey("Branch") && (string)d["Branch"] == "fake")), Times.Once());
