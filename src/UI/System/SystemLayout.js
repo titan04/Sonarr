@@ -23,7 +23,7 @@ define(
             template: 'System/SystemLayoutTemplate',
 
             regions: {
-                info    : '#info',
+                status  : '#status',
                 logs    : '#logs',
                 updates : '#updates',
                 backup  : '#backup',
@@ -31,7 +31,7 @@ define(
             },
 
             ui: {
-                infoTab    : '.x-info-tab',
+                statusTab  : '.x-status-tab',
                 logsTab    : '.x-logs-tab',
                 updatesTab : '.x-updates-tab',
                 backupTab  : '.x-backup-tab',
@@ -39,7 +39,7 @@ define(
             },
 
             events: {
-                'click .x-info-tab'    : '_showInfo',
+                'click .x-status-tab'  : '_showStatus',
                 'click .x-logs-tab'    : '_showLogs',
                 'click .x-updates-tab' : '_showUpdates',
                 'click .x-backup-tab'  : '_showBackup',
@@ -69,7 +69,7 @@ define(
                         this._showTasks();
                         break;
                     default:
-                        this._showInfo();
+                        this._showStatus();
                 }
             },
 
@@ -77,14 +77,14 @@ define(
                 Backbone.history.navigate(route, { trigger: true, replace: true });
             },
 
-            _showInfo: function (e) {
+            _showStatus: function (e) {
                 if (e) {
                     e.preventDefault();
                 }
 
-                this.info.show(new SystemInfoLayout());
-                this.ui.infoTab.tab('show');
-                this._navigate('system/info');
+                this.status.show(new SystemInfoLayout());
+                this.ui.statusTab.tab('show');
+                this._navigate('system/status');
             },
 
             _showLogs: function (e) {
