@@ -115,9 +115,12 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             var cleanedUpName = GetCleanedUpFolderName(directoryInfo.Name);
-            var quality = QualityParser.ParseQuality(cleanedUpName);
+            var folderInfo = Parser.Parser.ParseTitle(directoryInfo.Name);
 
-            _logger.Debug("{0} folder quality: {1}", cleanedUpName, quality);
+            if (folderInfo != null)
+            {
+                _logger.Debug("{0} folder quality: {1}", cleanedUpName, folderInfo.Quality);                
+            }
 
             var videoFiles = _diskScanService.GetVideoFiles(directoryInfo.FullName);
 
@@ -135,7 +138,7 @@ namespace NzbDrone.Core.MediaFiles
                 }
             }
 
-            var decisions = _importDecisionMaker.GetImportDecisions(videoFiles.ToList(), series, true, quality);
+            var decisions = _importDecisionMaker.GetImportDecisions(videoFiles.ToList(), series, true, folderInfo);
             var importResults = _importApprovedEpisodes.Import(decisions, true, downloadClientItem);
 
             if ((downloadClientItem == null || !downloadClientItem.IsReadOnly) && importResults.Any() && ShouldDeleteFolder(directoryInfo, series))
@@ -177,7 +180,9 @@ namespace NzbDrone.Core.MediaFiles
                 }
             }
 
-            var decisions = _importDecisionMaker.GetImportDecisions(new List<string>() { fileInfo.FullName }, series, true);
+            var folderInfo = Parser.Parser.ParseTitle(fileInfo.DirectoryName);
+            var decisions = _importDecisionMaker.GetImportDecisions(new List<string>() { fileInfo.FullName }, series, true, folderInfo);
+
             return _importApprovedEpisodes.Import(decisions, true, downloadClientItem);
         }
 
