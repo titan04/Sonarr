@@ -51,7 +51,8 @@ namespace NzbDrone.Core.Parser
 
             if (folderInfo != null)
             {
-                parsedEpisodeInfo = folderInfo;
+                parsedEpisodeInfo = folderInfo.JsonClone();
+                parsedEpisodeInfo.Quality = QualityParser.ParseQuality(Path.GetFileName(filename));
             }
 
             else
