@@ -18,7 +18,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
     public interface IMakeImportDecision
     {
         List<ImportDecision> GetImportDecisions(List<String> videoFiles, Series series);
-        List<ImportDecision> GetImportDecisions(List<String> videoFiles, Series series, bool sceneSource, ParsedEpisodeInfo folderInfo);
+        List<ImportDecision> GetImportDecisions(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo, bool sceneSource);
     }
 
     public class ImportDecisionMaker : IMakeImportDecision
@@ -28,7 +28,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
         private readonly IMediaFileService _mediaFileService;
         private readonly IDiskProvider _diskProvider;
         private readonly IVideoFileInfoReader _videoFileInfoReader;
-        private readonly ISampleService _sampleService;
+        private readonly IDetectSample _detectSample;
         private readonly Logger _logger;
 
         public ImportDecisionMaker(IEnumerable<IRejectWithReason> specifications,
@@ -36,7 +36,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                                    IMediaFileService mediaFileService,
                                    IDiskProvider diskProvider,
                                    IVideoFileInfoReader videoFileInfoReader,
-                                   ISampleService sampleService,
+                                   IDetectSample detectSample,
                                    Logger logger)
         {
             _specifications = specifications;
@@ -44,32 +44,27 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
             _mediaFileService = mediaFileService;
             _diskProvider = diskProvider;
             _videoFileInfoReader = videoFileInfoReader;
-            _sampleService = sampleService;
+            _detectSample = detectSample;
             _logger = logger;
         }
 
         public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Series series)
         {
-            return GetImportDecisions(videoFiles, series, false, null);
+            return GetImportDecisions(videoFiles, series, null, false);
         }
 
-        public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Series series, bool sceneSource, ParsedEpisodeInfo folderInfo)
+        public List<ImportDecision> GetImportDecisions(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo, bool sceneSource)
         {
             var newFiles = _mediaFileService.FilterExistingFiles(videoFiles.ToList(), series);
 
             _logger.Debug("Analyzing {0}/{1} files.", newFiles.Count, videoFiles.Count());
 
-            return GetDecisions(newFiles, series, sceneSource, folderInfo).ToList();
+            return GetDecisions(newFiles, series, folderInfo, sceneSource).ToList();
         }
 
-        private IEnumerable<ImportDecision> GetDecisions(List<String> videoFiles, Series series, bool sceneSource, ParsedEpisodeInfo folderInfo)
+        private IEnumerable<ImportDecision> GetDecisions(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo, bool sceneSource)
         {
-            var parseFolder = ParseFolder(videoFiles, series, folderInfo);
-
-            if (!parseFolder)
-            {
-                folderInfo = null;
-            }
+            var shouldUseFolderName = ShouldUseFolderName(videoFiles, series, folderInfo);
 
             foreach (var file in videoFiles)
             {
@@ -77,7 +72,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
 
                 try
                 {
-                    var localEpisode = _parsingService.GetLocalEpisode(file, series, sceneSource, parseFolder ? folderInfo : null);
+                    var localEpisode = _parsingService.GetLocalEpisode(file, series, shouldUseFolderName ? folderInfo : null, sceneSource);
 
                     if (localEpisode != null)
                     {
@@ -157,10 +152,8 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
             return null;
         }
 
-        private bool ParseFolder(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo)
+        private bool ShouldUseFolderName(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo)
         {
-            var files = new List<string>();
-
             if (folderInfo == null)
             {
                 return false;
@@ -171,26 +164,19 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                 return false;
             }
 
-            foreach (var file in videoFiles)
+            return videoFiles.Count(file =>
             {
                 var size = _diskProvider.GetFileSize(file);
                 var fileQuality = QualityParser.ParseQuality(file);
-                var parseResult = Parser.Parser.ParsePath(file);
+                var sample = _detectSample.IsSample(series, GetQuality(folderInfo, fileQuality, series), file, size, folderInfo.SeasonNumber);
 
-                if (parseResult == null)
+                if (sample)
                 {
                     return false;
                 }
 
-                var sample = _sampleService.IsSample(series, GetQuality(folderInfo, fileQuality, series), file, size, parseResult.SeasonNumber);
-
-                if (!sample)
-                {
-                    files.Add(file);
-                }
-            }
-
-            return files.Count == 1;
+                return true;
+            }) == 1;
         }
 
         private QualityModel GetQuality(ParsedEpisodeInfo folderInfo, QualityModel fileQuality, Series series)

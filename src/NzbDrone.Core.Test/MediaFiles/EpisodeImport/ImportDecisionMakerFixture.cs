@@ -78,7 +78,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             };
 
             Mocker.GetMock<IParsingService>()
-                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<Boolean>(), It.IsAny<ParsedEpisodeInfo>()))
+                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), It.IsAny<Boolean>()))
                   .Returns(_localEpisode);
 
             GivenVideoFiles(new List<string> { @"C:\Test\Unsorted\The.Office.S03E115.DVDRip.XviD-OSiTV.avi".AsOsAgnostic() });
@@ -89,9 +89,9 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             Mocker.SetConstant<IEnumerable<IRejectWithReason>>(mocks.Select(c => c.Object));
         }
 
-        private void GivenVideoFiles(List<string> videoFiles)
+        private void GivenVideoFiles(IEnumerable<string> videoFiles)
         {
-            _videoFiles = videoFiles;
+            _videoFiles = videoFiles.ToList();
 
             Mocker.GetMock<IMediaFileService>()
                 .Setup(c => c.FilterExistingFiles(_videoFiles, It.IsAny<Series>()))
@@ -103,7 +103,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
         {
             GivenSpecifications(_pass1, _pass2, _pass3, _fail1, _fail2, _fail3);
 
-            Subject.GetImportDecisions(_videoFiles, new Series(), false, null);
+            Subject.GetImportDecisions(_videoFiles, new Series(), null, false);
 
             _fail1.Verify(c => c.IsSatisfiedBy(_localEpisode), Times.Once());
             _fail2.Verify(c => c.IsSatisfiedBy(_localEpisode), Times.Once());
@@ -158,7 +158,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             GivenSpecifications(_pass1);
 
             Mocker.GetMock<IParsingService>()
-                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<Boolean>(), It.IsAny<ParsedEpisodeInfo>()))
+                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), It.IsAny<Boolean>()))
                   .Throws<TestException>();
 
             _videoFiles = new List<String>
@@ -168,14 +168,12 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
                     "The.Office.S03E115.DVDRip.XviD-OSiTV"
                 };
 
-            Mocker.GetMock<IMediaFileService>()
-                .Setup(c => c.FilterExistingFiles(_videoFiles, It.IsAny<Series>()))
-                .Returns(_videoFiles);
+            GivenVideoFiles(_videoFiles);
 
             Subject.GetImportDecisions(_videoFiles, _series);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<Boolean>(), It.IsAny<ParsedEpisodeInfo>()), Times.Exactly(_videoFiles.Count));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), It.IsAny<Boolean>()), Times.Exactly(_videoFiles.Count));
 
             ExceptionVerification.ExpectedErrors(3);
         }
@@ -197,7 +195,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             GivenSpecifications(_pass1, _pass2, _pass3);
             var expectedQuality = QualityParser.ParseQuality(_videoFiles.Single());
 
-            var result = Subject.GetImportDecisions(_videoFiles, _series, true, new ParsedEpisodeInfo{Quality = new QualityModel(Quality.SDTV)});
+            var result = Subject.GetImportDecisions(_videoFiles, _series, new ParsedEpisodeInfo{Quality = new QualityModel(Quality.SDTV)}, true);
 
             result.Single().LocalEpisode.Quality.Should().Be(expectedQuality);
         }
@@ -208,7 +206,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             GivenSpecifications(_pass1, _pass2, _pass3);
             var expectedQuality = new QualityModel(Quality.Bluray1080p);
 
-            var result = Subject.GetImportDecisions(_videoFiles, _series, true, new ParsedEpisodeInfo { Quality = expectedQuality });
+            var result = Subject.GetImportDecisions(_videoFiles, _series, new ParsedEpisodeInfo { Quality = expectedQuality }, true);
 
             result.Single().LocalEpisode.Quality.Should().Be(expectedQuality);
         }
@@ -219,7 +217,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             GivenSpecifications(_pass1);
 
             Mocker.GetMock<IParsingService>()
-                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<Boolean>(), It.IsAny<ParsedEpisodeInfo>()))
+                  .Setup(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), It.IsAny<Boolean>()))
                   .Throws(new EpisodeNotFoundException("Episode not found"));
 
             _videoFiles = new List<String>
@@ -229,14 +227,12 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
                     "The.Office.S03E115.DVDRip.XviD-OSiTV"
                 };
 
-            Mocker.GetMock<IMediaFileService>()
-                .Setup(c => c.FilterExistingFiles(_videoFiles, It.IsAny<Series>()))
-                .Returns(_videoFiles);
+            GivenVideoFiles(_videoFiles);
 
             Subject.GetImportDecisions(_videoFiles, _series);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<Boolean>(), It.IsAny<ParsedEpisodeInfo>()), Times.Exactly(_videoFiles.Count));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<String>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), It.IsAny<Boolean>()), Times.Exactly(_videoFiles.Count));
         }
 
         [Test]
@@ -250,17 +246,17 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
                              };
 
             GivenSpecifications(_pass1);
-            GivenVideoFiles(videoFiles.ToList());
+            GivenVideoFiles(videoFiles);
 
             var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01");
 
-            Subject.GetImportDecisions(_videoFiles, _series, true, folderInfo);
+            Subject.GetImportDecisions(_videoFiles, _series, folderInfo, true);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, null), Times.Exactly(3));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Exactly(3));
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, It.Is<ParsedEpisodeInfo>(p => p != null)), Times.Never());
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), It.Is<ParsedEpisodeInfo>(p => p != null), true), Times.Never());
         }
 
         [Test]
@@ -273,17 +269,17 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
                              };
 
             GivenSpecifications(_pass1);
-            GivenVideoFiles(videoFiles.ToList());
+            GivenVideoFiles(videoFiles);
 
             var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01E01");
 
-            Subject.GetImportDecisions(_videoFiles, _series, true, folderInfo);
+            Subject.GetImportDecisions(_videoFiles, _series, folderInfo, true);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, null), Times.Exactly(2));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Exactly(2));
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, It.Is<ParsedEpisodeInfo>(p => p != null)), Times.Never());
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), It.Is<ParsedEpisodeInfo>(p => p != null), true), Times.Never());
         }
 
         [Test]
@@ -293,13 +289,13 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
 
             var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01E01");
 
-            Subject.GetImportDecisions(_videoFiles, _series, true, folderInfo);
+            Subject.GetImportDecisions(_videoFiles, _series, folderInfo, true);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, It.IsAny<ParsedEpisodeInfo>()), Times.Exactly(1));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), true), Times.Exactly(1));
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, null), Times.Never());
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Never());
         }
 
         [Test]
@@ -314,19 +310,19 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             GivenSpecifications(_pass1);
             GivenVideoFiles(videoFiles.ToList());
 
-            Mocker.GetMock<ISampleService>()
+            Mocker.GetMock<IDetectSample>()
                   .Setup(s => s.IsSample(_series, It.IsAny<QualityModel>(), It.Is<string>(c => c.Contains("sample")), It.IsAny<long>(), It.IsAny<int>()))
                   .Returns(true);
 
             var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01E01");
 
-            Subject.GetImportDecisions(_videoFiles, _series, true, folderInfo);
+            Subject.GetImportDecisions(_videoFiles, _series, folderInfo, true);
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, It.IsAny<ParsedEpisodeInfo>()), Times.Exactly(2));
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), It.IsAny<ParsedEpisodeInfo>(), true), Times.Exactly(2));
 
             Mocker.GetMock<IParsingService>()
-                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), true, null), Times.Never());
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Never());
         }
     }
 }

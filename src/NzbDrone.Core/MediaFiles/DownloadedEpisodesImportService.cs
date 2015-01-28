@@ -26,7 +26,7 @@ namespace NzbDrone.Core.MediaFiles
         private readonly IParsingService _parsingService;
         private readonly IMakeImportDecision _importDecisionMaker;
         private readonly IImportApprovedEpisodes _importApprovedEpisodes;
-        private readonly ISampleService _sampleService;
+        private readonly IDetectSample _detectSample;
         private readonly Logger _logger;
 
         public DownloadedEpisodesImportService(IDiskProvider diskProvider,
@@ -35,7 +35,7 @@ namespace NzbDrone.Core.MediaFiles
                                                IParsingService parsingService,
                                                IMakeImportDecision importDecisionMaker,
                                                IImportApprovedEpisodes importApprovedEpisodes,
-                                               ISampleService sampleService,
+                                               IDetectSample detectSample,
                                                Logger logger)
         {
             _diskProvider = diskProvider;
@@ -44,7 +44,7 @@ namespace NzbDrone.Core.MediaFiles
             _parsingService = parsingService;
             _importDecisionMaker = importDecisionMaker;
             _importApprovedEpisodes = importApprovedEpisodes;
-            _sampleService = sampleService;
+            _detectSample = detectSample;
             _logger = logger;
         }
 
@@ -138,7 +138,7 @@ namespace NzbDrone.Core.MediaFiles
                 }
             }
 
-            var decisions = _importDecisionMaker.GetImportDecisions(videoFiles.ToList(), series, true, folderInfo);
+            var decisions = _importDecisionMaker.GetImportDecisions(videoFiles.ToList(), series, folderInfo, true);
             var importResults = _importApprovedEpisodes.Import(decisions, true, downloadClientItem);
 
             if ((downloadClientItem == null || !downloadClientItem.IsReadOnly) && importResults.Any() && ShouldDeleteFolder(directoryInfo, series))
@@ -181,7 +181,7 @@ namespace NzbDrone.Core.MediaFiles
             }
 
             var folderInfo = Parser.Parser.ParseTitle(fileInfo.DirectoryName);
-            var decisions = _importDecisionMaker.GetImportDecisions(new List<string>() { fileInfo.FullName }, series, true, folderInfo);
+            var decisions = _importDecisionMaker.GetImportDecisions(new List<string>() { fileInfo.FullName }, series, folderInfo, true);
 
             return _importApprovedEpisodes.Import(decisions, true, downloadClientItem);
         }
@@ -212,7 +212,7 @@ namespace NzbDrone.Core.MediaFiles
                 var size = _diskProvider.GetFileSize(videoFile);
                 var quality = QualityParser.ParseQuality(videoFile);
 
-                if (!_sampleService.IsSample(series, quality, videoFile, size,
+                if (!_detectSample.IsSample(series, quality, videoFile, size,
                     episodeParseResult.SeasonNumber))
                 {
                     _logger.Warn("Non-sample file detected: [{0}]", videoFile);

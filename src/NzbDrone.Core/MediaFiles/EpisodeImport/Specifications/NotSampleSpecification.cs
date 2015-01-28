@@ -5,13 +5,13 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport.Specifications
 {
     public class NotSampleSpecification : IImportDecisionEngineSpecification
     {
-        private readonly ISampleService _sampleService;
+        private readonly IDetectSample _detectSample;
         private readonly Logger _logger;
 
-        public NotSampleSpecification(ISampleService sampleService,
+        public NotSampleSpecification(IDetectSample detectSample,
                                       Logger logger)
         {
-            _sampleService = sampleService;
+            _detectSample = detectSample;
             _logger = logger;
         }
 
@@ -25,7 +25,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport.Specifications
                 return true;
             }
 
-            return !_sampleService.IsSample(localEpisode.Series,
+            return !_detectSample.IsSample(localEpisode.Series,
                                             localEpisode.Quality,
                                             localEpisode.Path,
                                             localEpisode.Size,
