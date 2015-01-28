@@ -59,62 +59,62 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
 
             _logger.Debug("Analyzing {0}/{1} files.", newFiles.Count, videoFiles.Count());
 
-            return GetDecisions(newFiles, series, folderInfo, sceneSource).ToList();
+            var shouldUseFolderName = ShouldUseFolderName(videoFiles, series, folderInfo);
+            var decisions = new List<ImportDecision>();
+
+            foreach (var file in newFiles)
+            {
+                decisions.AddIfNotNull(GetDecision(file, series, folderInfo, sceneSource, shouldUseFolderName));
+            }
+
+            return decisions;
         }
 
-        private IEnumerable<ImportDecision> GetDecisions(List<string> videoFiles, Series series, ParsedEpisodeInfo folderInfo, bool sceneSource)
+        private ImportDecision GetDecision(string file, Series series, ParsedEpisodeInfo folderInfo, bool sceneSource, bool shouldUseFolderName)
         {
-            var shouldUseFolderName = ShouldUseFolderName(videoFiles, series, folderInfo);
+            ImportDecision decision = null;
 
-            foreach (var file in videoFiles)
+            try
             {
-                ImportDecision decision = null;
+                var localEpisode = _parsingService.GetLocalEpisode(file, series, shouldUseFolderName ? folderInfo : null, sceneSource);
 
-                try
+                if (localEpisode != null)
                 {
-                    var localEpisode = _parsingService.GetLocalEpisode(file, series, shouldUseFolderName ? folderInfo : null, sceneSource);
+                    localEpisode.Quality = GetQuality(folderInfo, localEpisode.Quality, series);
+                    localEpisode.Size = _diskProvider.GetFileSize(file);
 
-                    if (localEpisode != null)
+                    _logger.Debug("Size: {0}", localEpisode.Size);
+
+                    //TODO: make it so media info doesn't ruin the import process of a new series
+                    if (sceneSource)
                     {
-                        localEpisode.Quality = GetQuality(folderInfo, localEpisode.Quality, series);
-                        localEpisode.Size = _diskProvider.GetFileSize(file);
-
-                        _logger.Debug("Size: {0}", localEpisode.Size);
-
-                        //TODO: make it so media info doesn't ruin the import process of a new series
-                        if (sceneSource)
-                        {
-                            localEpisode.MediaInfo = _videoFileInfoReader.GetMediaInfo(file);
-                        }
-                        
-                        decision = GetDecision(localEpisode);
+                        localEpisode.MediaInfo = _videoFileInfoReader.GetMediaInfo(file);
                     }
 
-                    else
-                    {
-                        localEpisode = new LocalEpisode();
-                        localEpisode.Path = file;
-
-                        decision = new ImportDecision(localEpisode, "Unable to parse file");
-                    }
+                    decision = GetDecision(localEpisode);
                 }
-                catch (EpisodeNotFoundException e)
+
+                else
                 {
-                    var localEpisode = new LocalEpisode();
+                    localEpisode = new LocalEpisode();
                     localEpisode.Path = file;
 
-                    decision = new ImportDecision(localEpisode, e.Message);
-                }
-                catch (Exception e)
-                {
-                    _logger.ErrorException("Couldn't import file. " + file, e);
-                }
-
-                if (decision != null)
-                {
-                    yield return decision;
+                    decision = new ImportDecision(localEpisode, "Unable to parse file");
                 }
             }
+            catch (EpisodeNotFoundException e)
+            {
+                var localEpisode = new LocalEpisode();
+                localEpisode.Path = file;
+
+                decision = new ImportDecision(localEpisode, e.Message);
+            }
+            catch (Exception e)
+            {
+                _logger.ErrorException("Couldn't import file. " + file, e);
+            }
+
+            return decision;
         }
 
         private ImportDecision GetDecision(LocalEpisode localEpisode)
