@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.MediaFiles.EpisodeImport;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Tv;
@@ -232,14 +233,14 @@ namespace NzbDrone.Core.MediaFiles
         private ImportResult FileIsLockedResult(string videoFile)
         {
             _logger.Debug("[{0}] is currently locked by another process, skipping", videoFile);
-            return new ImportResult(new ImportDecision(new LocalEpisode { Path = videoFile }, "Locked file, try again later"), "Locked file, try again later");
+            return new ImportResult(new ImportDecision(new LocalEpisode { Path = videoFile }, new Rejection("Locked file, try again later")), "Locked file, try again later");
         }
 
         private ImportResult UnknownSeriesResult(string message, string videoFile = null)
         {
             var localEpisode = videoFile == null ? null : new LocalEpisode { Path = videoFile };
 
-            return new ImportResult(new ImportDecision(localEpisode, "Unknown Series"), message);
+            return new ImportResult(new ImportDecision(localEpisode, new Rejection("Unknown Series")), message);
         }
     }
 }

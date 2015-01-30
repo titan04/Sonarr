@@ -45,24 +45,13 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
             _fail2 = new Mock<IImportDecisionEngineSpecification>();
             _fail3 = new Mock<IImportDecisionEngineSpecification>();
 
-            _pass1.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(true);
-            _pass1.Setup(c => c.RejectionReason).Returns("_pass1");
+            _pass1.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Accept());
+            _pass2.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Accept());
+            _pass3.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Accept());
 
-            _pass2.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(true);
-            _pass2.Setup(c => c.RejectionReason).Returns("_pass2");
-
-            _pass3.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(true);
-            _pass3.Setup(c => c.RejectionReason).Returns("_pass3");
-
-
-            _fail1.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(false);
-            _fail1.Setup(c => c.RejectionReason).Returns("_fail1");
-
-            _fail2.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(false);
-            _fail2.Setup(c => c.RejectionReason).Returns("_fail2");
-
-            _fail3.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(false);
-            _fail3.Setup(c => c.RejectionReason).Returns("_fail3");
+            _fail1.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Reject("_fail1"));
+            _fail2.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Reject("_fail2"));
+            _fail3.Setup(c => c.IsSatisfiedBy(It.IsAny<LocalEpisode>())).Returns(Decision.Reject("_fail3"));
 
             _series = Builder<Series>.CreateNew()
                                      .With(e => e.Profile = new Profile { Items = Qualities.QualityFixture.GetDefaultQualities() })
@@ -86,7 +75,7 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
 
         private void GivenSpecifications(params Mock<IImportDecisionEngineSpecification>[] mocks)
         {
-            Mocker.SetConstant<IEnumerable<IRejectWithReason>>(mocks.Select(c => c.Object));
+            Mocker.SetConstant(mocks.Select(c => c.Object));
         }
 
         private void GivenVideoFiles(IEnumerable<string> videoFiles)
@@ -285,7 +274,13 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
         [Test]
         public void should_use_folder_when_only_one_video_file()
         {
+            var videoFiles = new[]
+                             {
+                                 @"C:\Test\Unsorted\Series.Title.S01E01\S01E01.mkv".AsOsAgnostic()
+                             };
+
             GivenSpecifications(_pass1);
+            GivenVideoFiles(videoFiles);
 
             var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01E01");
 
@@ -323,6 +318,28 @@ namespace NzbDrone.Core.Test.MediaFiles.EpisodeImport
 
             Mocker.GetMock<IParsingService>()
                   .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Never());
+        }
+
+        [Test]
+        public void should_not_use_folder_name_if_file_name_is_scene_name()
+        {
+            var videoFiles = new[]
+                             {
+                                 @"C:\Test\Unsorted\Series.Title.S01E01.720p.HDTV-LOL\Series.Title.S01E01.720p.HDTV-LOL.mkv".AsOsAgnostic()
+                             };
+
+            GivenSpecifications(_pass1);
+            GivenVideoFiles(videoFiles);
+
+            var folderInfo = Parser.Parser.ParseTitle("Series.Title.S01E01.720p.HDTV-LOL");
+
+            Subject.GetImportDecisions(_videoFiles, _series, folderInfo, true);
+
+            Mocker.GetMock<IParsingService>()
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), null, true), Times.Exactly(1));
+
+            Mocker.GetMock<IParsingService>()
+                  .Verify(c => c.GetLocalEpisode(It.IsAny<string>(), It.IsAny<Series>(), It.Is<ParsedEpisodeInfo>(p => p != null), true), Times.Never());
         }
     }
 }

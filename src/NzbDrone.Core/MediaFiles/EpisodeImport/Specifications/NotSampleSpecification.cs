@@ -1,4 +1,5 @@
 ﻿using NLog;
+using NzbDrone.Core.DecisionEngine;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MediaFiles.EpisodeImport.Specifications
@@ -15,21 +16,26 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport.Specifications
             _logger = logger;
         }
 
-        public string RejectionReason { get { return "Sample"; } }
-
-        public bool IsSatisfiedBy(LocalEpisode localEpisode)
+        public Decision IsSatisfiedBy(LocalEpisode localEpisode)
         {
             if (localEpisode.ExistingFile)
             {
                 _logger.Debug("Existing file, skipping sample check");
-                return true;
+                return Decision.Accept();
             }
 
-            return !_detectSample.IsSample(localEpisode.Series,
-                                            localEpisode.Quality,
-                                            localEpisode.Path,
-                                            localEpisode.Size,
-                                            localEpisode.SeasonNumber);
+            var sample = _detectSample.IsSample(localEpisode.Series,
+                                                localEpisode.Quality,
+                                                localEpisode.Path,
+                                                localEpisode.Size,
+                                                localEpisode.SeasonNumber);
+
+            if (sample)
+            {
+                return Decision.Reject("Sample");
+            }
+
+            return Decision.Accept();
         }
     }
 }

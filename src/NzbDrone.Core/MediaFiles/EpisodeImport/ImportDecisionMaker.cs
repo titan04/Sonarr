@@ -23,7 +23,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
 
     public class ImportDecisionMaker : IMakeImportDecision
     {
-        private readonly IEnumerable<IRejectWithReason> _specifications;
+        private readonly IEnumerable<IImportDecisionEngineSpecification> _specifications;
         private readonly IParsingService _parsingService;
         private readonly IMediaFileService _mediaFileService;
         private readonly IDiskProvider _diskProvider;
@@ -31,7 +31,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
         private readonly IDetectSample _detectSample;
         private readonly Logger _logger;
 
-        public ImportDecisionMaker(IEnumerable<IRejectWithReason> specifications,
+        public ImportDecisionMaker(IEnumerable<IImportDecisionEngineSpecification> specifications,
                                    IParsingService parsingService,
                                    IMediaFileService mediaFileService,
                                    IDiskProvider diskProvider,
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                     localEpisode = new LocalEpisode();
                     localEpisode.Path = file;
 
-                    decision = new ImportDecision(localEpisode, "Unable to parse file");
+                    decision = new ImportDecision(localEpisode, new Rejection("Unable to parse file"));
                 }
             }
             catch (EpisodeNotFoundException e)
@@ -107,7 +107,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                 var localEpisode = new LocalEpisode();
                 localEpisode.Path = file;
 
-                decision = new ImportDecision(localEpisode, e.Message);
+                decision = new ImportDecision(localEpisode, new Rejection(e.Message));
             }
             catch (Exception e)
             {
@@ -120,25 +120,20 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
         private ImportDecision GetDecision(LocalEpisode localEpisode)
         {
             var reasons = _specifications.Select(c => EvaluateSpec(c, localEpisode))
-                                         .Where(c => c.IsNotNullOrWhiteSpace());
+                                         .Where(c => c != null);
 
             return new ImportDecision(localEpisode, reasons.ToArray());
         }
 
-        private string EvaluateSpec(IRejectWithReason spec, LocalEpisode localEpisode)
+        private Rejection EvaluateSpec(IImportDecisionEngineSpecification spec, LocalEpisode localEpisode)
         {
             try
             {
-                if (spec.RejectionReason.IsNullOrWhiteSpace())
-                {
-                    throw new InvalidOperationException("[Need Rejection Text]");
-                }
+                var result = spec.IsSatisfiedBy(localEpisode);
 
-                var generalSpecification = spec as IImportDecisionEngineSpecification;
-
-                if (generalSpecification != null && !generalSpecification.IsSatisfiedBy(localEpisode))
+                if (!result.Accepted)
                 {
-                    return spec.RejectionReason;
+                    return new Rejection(result.Reason);
                 }
             }
             catch (Exception e)
@@ -146,7 +141,7 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                 //e.Data.Add("report", remoteEpisode.Report.ToJson());
                 //e.Data.Add("parsed", remoteEpisode.ParsedEpisodeInfo.ToJson());
                 _logger.ErrorException("Couldn't evaluate decision on " + localEpisode.Path, e);
-                return String.Format("{0}: {1}", spec.GetType().Name, e.Message);
+                return new Rejection(String.Format("{0}: {1}", spec.GetType().Name, e.Message));
             }
 
             return null;
@@ -171,6 +166,11 @@ namespace NzbDrone.Core.MediaFiles.EpisodeImport
                 var sample = _detectSample.IsSample(series, GetQuality(folderInfo, fileQuality, series), file, size, folderInfo.SeasonNumber);
 
                 if (sample)
+                {
+                    return false;
+                }
+
+                if (SceneChecker.IsSceneTitle(Path.GetFileName(file)))
                 {
                     return false;
                 }
