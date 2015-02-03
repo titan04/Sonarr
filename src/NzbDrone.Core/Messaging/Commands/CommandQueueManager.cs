@@ -6,7 +6,6 @@ using NzbDrone.Common;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Common.Serializer;
-using NzbDrone.Core.Jobs;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Events;
 
@@ -14,9 +13,8 @@ namespace NzbDrone.Core.Messaging.Commands
 {
     public interface IManageCommandQueue
     {
-        CommandModel Push<TCommand>(TCommand command) where TCommand : Command;
-        CommandModel Push(string commandName);
-        CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified);
+        CommandModel Push<TCommand>(TCommand command, CommandPriority priority = CommandPriority.Normal, CommandTrigger trigger = CommandTrigger.Unspecified) where TCommand : Command;
+        CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandPriority priority = CommandPriority.Normal, CommandTrigger trigger = CommandTrigger.Unspecified);
         CommandModel Pop();
         CommandModel Get(int id);
         List<CommandModel> GetStarted(); 
@@ -47,7 +45,7 @@ namespace NzbDrone.Core.Messaging.Commands
             _messageCache = cacheManager.GetCache<string>(GetType());
         }
 
-        public CommandModel Push<TCommand>(TCommand command) where TCommand : Command
+        public CommandModel Push<TCommand>(TCommand command, CommandPriority priority = CommandPriority.Normal, CommandTrigger trigger = CommandTrigger.Unspecified) where TCommand : Command
         {
             Ensure.That(command, () => command).IsNotNull();
 
@@ -70,8 +68,8 @@ namespace NzbDrone.Core.Messaging.Commands
                                        Name = command.Name,
                                        Body = command,
                                        QueuedAt = DateTime.UtcNow,
-                                       Trigger = command.Trigger,
-                                       Priority = CommandPriority.Normal,
+                                       Trigger = trigger,
+                                       Priority = priority,
                                        Status = CommandStatus.Queued
                                    };
 
@@ -81,20 +79,13 @@ namespace NzbDrone.Core.Messaging.Commands
             }
         }
 
-        public CommandModel Push(string commandName)
-        {
-            var command = Push(commandName, null);
-
-            return command;
-        }
-
-        public CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandTrigger trigger = CommandTrigger.Unspecified)
+        public CommandModel Push(string commandName, DateTime? lastExecutionTime, CommandPriority priority = CommandPriority.Normal, CommandTrigger trigger = CommandTrigger.Unspecified)
         {
             dynamic command = GetCommand(commandName);
             command.LastExecutionTime = lastExecutionTime;
             command.Trigger = trigger;
 
-            return Push(command);
+            return Push(command, priority);
         }
 
         public CommandModel Pop()

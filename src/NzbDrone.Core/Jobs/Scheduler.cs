@@ -40,7 +40,7 @@ namespace NzbDrone.Core.Jobs
 
                 foreach (var task in tasks)
                 {
-                    _commandQueueManager.Push(task.TypeName, task.LastExecution, CommandTrigger.Scheduled);
+                    _commandQueueManager.Push(task.TypeName, task.LastExecution, CommandPriority.Low, CommandTrigger.Scheduled);
                 }
             }
 

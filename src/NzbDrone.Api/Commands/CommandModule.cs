@@ -50,7 +50,7 @@ namespace NzbDrone.Api.Commands
             dynamic command = Request.Body.FromJson(commandType);
             command.Trigger = CommandTrigger.Manual;
 
-            var trackedCommand = (CommandModel)_commandQueueManager.Push(command);
+            var trackedCommand = (CommandModel)_commandQueueManager.Push(command, CommandPriority.Normal, CommandTrigger.Manual);
             return trackedCommand.Id;
         }
 

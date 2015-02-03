@@ -3,7 +3,7 @@ using NzbDrone.Core.Datastore.Migration.Framework;
 
 namespace NzbDrone.Core.Datastore.Migration
 {
-    [Migration(76)]
+    [Migration(78)]
     public class add_commands_table : NzbDroneMigrationBase
     {
         protected override void MainDbUpgrade()

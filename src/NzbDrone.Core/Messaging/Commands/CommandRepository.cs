@@ -8,7 +8,7 @@ namespace NzbDrone.Core.Messaging.Commands
 {
     public interface ICommandRepository : IBasicRepository<CommandModel>
     {
-        void Clean();
+        void Trim();
         void OrphanStarted();
         List<CommandModel> FindCommands(string name);
         List<CommandModel> FindQueuedOrStarted(string name);
@@ -24,7 +24,7 @@ namespace NzbDrone.Core.Messaging.Commands
         {
         }
 
-        public void Clean()
+        public void Trim()
         {
             Delete(c => c.EndedAt < DateTime.UtcNow.AddDays(-1));
         }
